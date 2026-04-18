@@ -1,0 +1,25 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vite
+.wrangler
+
+# 原始 GPX（隐私数据，不入库）
+raw/
+
+# TypeScript / Vite 构建辅助产物
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+
+# 截图临时目录
+/tmp-shots
+
+# 编辑器
+.vscode
+.idea
+
+# 注：public/data/ 故意不在此处忽略
+# 数据三件套（points/track/summary）随仓库提交，用于 CI 构建
+# 本地添加新 GPX 后，跑 npm run build:data 重生 + commit
