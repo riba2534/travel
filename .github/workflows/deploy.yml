@@ -52,10 +52,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >-
-            pages deploy dist
-            --project-name=travel-map
-            --branch=${{ github.head_ref || github.ref_name }}
-            --commit-hash=${{ github.sha }}
-            --commit-message="${{ github.event.head_commit.message || 'manual deploy' }}"
-            --commit-dirty=true
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          # 不传 --commit-message：commit message 多行会破坏 shell 解析
+          # Cloudflare 会通过 --commit-hash 自动从 GitHub 拉取消息
+          command: pages deploy dist --project-name=travel-map --branch=${{ github.head_ref || github.ref_name }} --commit-hash=${{ github.sha }} --commit-dirty=true
