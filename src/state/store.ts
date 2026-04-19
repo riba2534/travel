@@ -24,9 +24,14 @@ export interface FlyTarget {
 }
 
 export interface ShareOptions {
+  // 文字叠加层
   title: boolean;
   stats: boolean;
   date: boolean;
+  // 地图图层开关（独立于主图的 layers，仅对导出生效）
+  showPoints: boolean;
+  showTrack: boolean;
+  showHeatmap: boolean;
 }
 
 interface AppState {
@@ -57,9 +62,14 @@ interface AppState {
 }
 
 const DEFAULT_SHARE_OPTS: ShareOptions = {
+  // 文字默认全开
   title: true,
   stats: true,
   date: true,
+  // 图层默认只开轨迹点
+  showPoints: true,
+  showTrack: false,
+  showHeatmap: false,
 };
 
 export const useAppStore = create<AppState>()(

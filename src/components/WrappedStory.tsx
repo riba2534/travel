@@ -7,7 +7,16 @@ import WrappedMap, { type WrappedMapHandle } from './WrappedMap';
 import SharePreview from './SharePreview';
 import { exportShare } from '../lib/share';
 
-const SHARE_OPTS_YEAR = { title: true, stats: true, date: true } as const;
+// 年度分享图自带 WrappedMap 实例并自管 yr-* layer；show* 字段在 exportShare 里通过
+// layerIds: {} 短路掉，此处值仅为满足类型契约
+const SHARE_OPTS_YEAR = {
+  title: true,
+  stats: true,
+  date: true,
+  showPoints: false,
+  showTrack: false,
+  showHeatmap: false,
+} as const;
 const BOOST_GLOW_RADIUS = 14;
 const BOOST_CORE_RADIUS = 4;
 const BOOST_TRACK_GLOW = 8;
@@ -353,7 +362,7 @@ async function generateYearShareImage(
   map.setPaintProperty('yr-track-core', 'line-width', BOOST_TRACK_CORE);
 
   try {
-    return await exportShare(map, summary, SHARE_OPTS_YEAR, { year, bbox });
+    return await exportShare(map, summary, SHARE_OPTS_YEAR, { year, bbox, layerIds: {} });
   } finally {
     map.setPaintProperty('yr-points-glow', 'circle-radius', before.pointsGlow);
     map.setPaintProperty('yr-points-core', 'circle-radius', before.pointsCore);

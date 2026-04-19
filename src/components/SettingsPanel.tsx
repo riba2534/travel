@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import ThemePicker from './ThemePicker';
+import ShareSettings from './ShareSettings';
 
 interface Props {
   open: boolean;
@@ -6,6 +8,8 @@ interface Props {
 }
 
 export default function SettingsPanel({ open, onClose }: Props) {
+  const [tab, setTab] = useState<'theme' | 'share'>('theme');
+
   if (!open) return null;
 
   return (
@@ -36,8 +40,31 @@ export default function SettingsPanel({ open, onClose }: Props) {
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-0.5 border-b border-white/[0.06] px-2 pt-2">
+          {(
+            [
+              ['theme', '主题'],
+              ['share', '分享图'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              aria-pressed={tab === id}
+              className={`px-3 py-1.5 text-xs rounded-t-lg transition-colors ${
+                tab === id ? 'bg-white/[0.06] text-text' : 'text-text-dim hover:text-text'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="p-4">
-          <ThemePicker />
+          {tab === 'theme' && <ThemePicker />}
+          {tab === 'share' && <ShareSettings />}
         </div>
       </div>
     </>

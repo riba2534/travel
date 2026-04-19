@@ -1,5 +1,5 @@
-// 首页底部的「生成分享图」按钮：一键生成 1920×1080 PNG，弹预览。
-// opts 用 store 里的默认值（title+stats+date），不再暴露勾选面板。
+// 首页「分享图」入口：点击直接用 store.shareOpts 生成，弹 SharePreview。
+// 对「显示哪些内容」的配置放在 SettingsPanel > 分享 tab 里。
 
 import { useState } from 'react';
 import { useAppStore } from '../state/store';
@@ -42,7 +42,7 @@ export default function ShareButton() {
         onClick={onClick}
         disabled={busy || !summary}
         aria-label="生成分享图"
-        title="生成 1920×1080 分享图"
+        title="生成分享图（在设置里可调显示内容）"
         className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md text-text-dim hover:text-text active:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: 'var(--panel)' }}
       >
