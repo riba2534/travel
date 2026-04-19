@@ -1,10 +1,10 @@
 {
-  "name": "我的足迹",
-  "short_name": "足迹",
+  "name": "HPCのJourneys",
+  "short_name": "HPC Journeys",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0A0F",
-  "theme_color": "#0A0A0F",
+  "background_color": "#F5F1EA",
+  "theme_color": "#F5F1EA",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }

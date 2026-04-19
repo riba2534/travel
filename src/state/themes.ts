@@ -200,7 +200,7 @@ export const THEMES: Theme[] = [
   },
 ];
 
-export const DEFAULT_THEME_ID = 'midnight';
+export const DEFAULT_THEME_ID = 'paper';
 
 export function getTheme(id: string): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];

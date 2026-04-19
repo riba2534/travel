@@ -413,7 +413,124 @@ if (unknownCountries.length > 0) {
 }
 console.log(`  continents: ${places.continents.length}, total countries: ${places.continents.reduce((s, c) => s + c.countries.length, 0)}`);
 
-// 4.6 写文件
+// 4.6 yearStats：年度 Wrapped 的素材
+console.log('→ building yearStats...');
+type YearStat = {
+  year: number;
+  points: number;
+  km: number;
+  countries: string[];
+  topCities: { name: string; lat: number; lon: number; count: number }[];
+  farthestDay: { date: string; km: number } | null;
+};
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+const yearStats: YearStat[] = years.map((yr) => {
+  const yearPts = pts.filter((p) => new Date(p.t * 1000).getUTCFullYear() === yr);
+  // 连续点累计里程（与 track 相同的 30min 切段规则）
+  let kmYear = 0;
+  for (let i = 1; i < yearPts.length; i++) {
+    const prev = yearPts[i - 1];
+    const cur = yearPts[i];
+    if (cur.t - prev.t > GAP) continue;
+    kmYear += haversineKm(prev.lat, prev.lon, cur.lat, cur.lon);
+  }
+  // 年内 unique 国家（复用 cellCountry + ISO 去重）
+  const yearIsoSet = new Set<string>();
+  for (const p of yearPts) {
+    const k = `${Math.round(p.lon / CELL)},${Math.round(p.lat / CELL)}`;
+    const eng = cellCountry.get(k);
+    if (!eng) continue;
+    const meta = getCountryMeta(eng);
+    yearIsoSet.add(meta.zh || eng);
+  }
+  // 年内 TOP 5 城市（0.5° 网格 + 最近 knownCity，阈值 10 更灵活）
+  const yearGrid = new Map<string, { lat: number; lon: number; count: number }>();
+  for (const p of yearPts) {
+    const gx = Math.round(p.lon / STEP) * STEP;
+    const gy = Math.round(p.lat / STEP) * STEP;
+    const key = `${gx},${gy}`;
+    const e = yearGrid.get(key);
+    if (e) { e.count++; e.lat += p.lat; e.lon += p.lon; }
+    else yearGrid.set(key, { lat: p.lat, lon: p.lon, count: 1 });
+  }
+  type YC = { name: string; lat: number; lon: number; count: number };
+  const yearCities: YC[] = [];
+  for (const [, v] of yearGrid) {
+    if (v.count < 10) continue;
+    const cellLat = v.lat / v.count;
+    const cellLon = v.lon / v.count;
+    // 海上过滤
+    let onLand = false;
+    for (const f of countriesFC.features) {
+      const bb = countryBBox.get(f.properties.name)!;
+      if (cellLon < bb[0] || cellLon > bb[2] || cellLat < bb[1] || cellLat > bb[3]) continue;
+      if (booleanPointInPolygon([cellLon, cellLat], f)) { onLand = true; break; }
+    }
+    if (!onLand) continue;
+    let best: { name: string; d: number } | null = null;
+    for (const c of knownCities) {
+      const d = Math.hypot(c.lat - cellLat, c.lon - cellLon);
+      if (d < 0.8 && (!best || d < best.d)) best = { name: c.name, d };
+    }
+    yearCities.push({
+      name: best?.name ?? `${cellLat.toFixed(2)}, ${cellLon.toFixed(2)}`,
+      lat: +cellLat.toFixed(4),
+      lon: +cellLon.toFixed(4),
+      count: v.count,
+    });
+  }
+  // 同名合并 + TOP 5
+  const yearCityMap = new Map<string, YC>();
+  for (const c of yearCities.sort((a, b) => b.count - a.count)) {
+    const ex = yearCityMap.get(c.name);
+    if (!ex) yearCityMap.set(c.name, c);
+    else ex.count += c.count;
+  }
+  const topCitiesYear = [...yearCityMap.values()].sort((a, b) => b.count - a.count).slice(0, 5);
+
+  // 最远一天：按 UTC 日切分，取当天连续行走累计里程最长的一天（口径同年度 km，30min 断线）
+  const byDay = new Map<string, typeof yearPts>();
+  for (const p of yearPts) {
+    const d = new Date(p.t * 1000);
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key)!.push(p);
+  }
+  let farthestDay: { date: string; km: number } | null = null;
+  for (const [day, dayPts] of byDay) {
+    if (dayPts.length < 2) continue;
+    let kmDay = 0;
+    for (let i = 1; i < dayPts.length; i++) {
+      const prev = dayPts[i - 1];
+      const cur = dayPts[i];
+      if (cur.t - prev.t > GAP) continue;
+      kmDay += haversineKm(prev.lat, prev.lon, cur.lat, cur.lon);
+    }
+    if (kmDay <= 0) continue;
+    if (!farthestDay || kmDay > farthestDay.km) farthestDay = { date: day, km: Math.round(kmDay) };
+  }
+
+  return {
+    year: yr,
+    points: yearPts.length,
+    km: Math.round(kmYear),
+    countries: [...yearIsoSet].sort(),
+    topCities: topCitiesYear,
+    farthestDay,
+  };
+});
+console.log(`  yearStats: ${yearStats.length} years`);
+
+// 4.7 写文件
 const summary = {
   totalPoints: pts.length,
   segments: segments.length,
@@ -428,6 +545,7 @@ const summary = {
     +maxLat.toFixed(4),
   ],
   topCities,
+  yearStats,
   generatedAt: new Date().toISOString(),
 };
 

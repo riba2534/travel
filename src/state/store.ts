@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Summary, Places } from '../lib/types';
+import { DEFAULT_THEME_ID } from './themes';
 
 export interface LayerVisibility {
   points: boolean;
@@ -72,7 +73,7 @@ export const useAppStore = create<AppState>()(
       yearEnd: null,
       layers: { points: true, heatmap: false, track: true },
       filter: {},
-      themeId: 'midnight',
+      themeId: DEFAULT_THEME_ID,
       uiHidden: false,
       exporting: false,
       flyTarget: null,

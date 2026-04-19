@@ -17,11 +17,11 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
 
   return (
     <div
-      className="pointer-events-auto flex-1 max-w-2xl rounded-2xl border border-white/[0.08] px-3 sm:px-5 py-2.5 sm:py-3 shadow-2xl backdrop-blur-md"
+      className="pointer-events-auto flex-1 max-w-2xl rounded-2xl border border-white/[0.08] px-3 sm:px-4 py-1.5 shadow-2xl backdrop-blur-md"
       style={{ background: 'var(--panel)' }}
     >
       {/* 年份 + 数量条 */}
-      <div className="mb-1.5 flex items-end justify-between gap-1">
+      <div className="mb-0.5 flex items-end justify-between gap-1">
         {years.map((y) => {
           const pct = ((perYear[String(y)] ?? 0) / maxCount) * 100;
           const inRange = y >= start && y <= end;
@@ -30,8 +30,8 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
               <div
                 className="w-full rounded-sm transition-all"
                 style={{
-                  height: `${Math.max(pct * 0.24, 2)}px`,
-                  background: inRange ? 'var(--accent)' : 'var(--accent)',
+                  height: `${Math.max(pct * 0.14, 2)}px`,
+                  background: 'var(--accent)',
                   opacity: inRange ? 0.85 : 0.25,
                 }}
                 title={`${y}: ${(perYear[String(y)] ?? 0).toLocaleString()} 点`}
@@ -42,7 +42,7 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
       </div>
 
       {/* 双滑块 */}
-      <div className="relative h-6 sm:h-7">
+      <div className="relative h-5">
         {/* 轨道 */}
         <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
         {/* 已选区间 */}
@@ -87,7 +87,7 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
       </div>
 
       {/* 当前选中年份显示 */}
-      <div className="mt-1 flex items-center justify-between text-[10px] sm:text-xs font-mono tabular-nums text-text-dim">
+      <div className="mt-0.5 flex items-center justify-between text-[10px] font-mono tabular-nums text-text-dim">
         <span className={start === min ? '' : 'text-accent'}>{start}</span>
         <span className="text-text-dim/60">
           {start === end ? `${perYear[String(start)] ?? 0} 个点` : `${end - start + 1} 年`}
@@ -100,33 +100,33 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
         .range-thumb::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 22px;
-          height: 22px;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
           background: var(--accent);
           border: 2px solid var(--bg);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
           cursor: pointer;
           pointer-events: auto;
         }
         .range-thumb::-moz-range-thumb {
-          width: 22px;
-          height: 22px;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
           background: var(--accent);
           border: 2px solid var(--bg);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
           cursor: pointer;
           pointer-events: auto;
         }
         .range-thumb::-webkit-slider-runnable-track { background: transparent; }
         .range-thumb::-moz-range-track { background: transparent; }
         .range-thumb:focus { outline: none; }
-        .range-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(255,255,255,0.2); }
-        .range-thumb:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(255,255,255,0.2); }
+        .range-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(255,255,255,0.2); }
+        .range-thumb:focus::-moz-range-thumb { box-shadow: 0 0 0 3px rgba(255,255,255,0.2); }
         @media (max-width: 640px) {
-          .range-thumb::-webkit-slider-thumb { width: 26px; height: 26px; }
-          .range-thumb::-moz-range-thumb { width: 26px; height: 26px; }
+          .range-thumb::-webkit-slider-thumb { width: 20px; height: 20px; }
+          .range-thumb::-moz-range-thumb { width: 20px; height: 20px; }
         }
       `}</style>
     </div>

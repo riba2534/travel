@@ -185,42 +185,90 @@ export default function PlacesMenu() {
   );
 
   return (
-    <div className="pointer-events-auto flex flex-col items-end gap-2">
-      {/* 移动端触发按钮 */}
-      <button
-        type="button"
-        onClick={() => setDrawerOpen((o) => !o)}
-        aria-expanded={drawerOpen}
-        aria-label={drawerOpen ? '关闭地点菜单' : '打开地点菜单'}
-        className="sm:hidden inline-flex h-11 min-w-[44px] items-center gap-1.5 rounded-2xl border border-white/[0.08] px-3 text-xs font-medium shadow-2xl backdrop-blur-md active:bg-white/5"
-        style={{ background: 'var(--panel)' }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-7-7-12a7 7 0 1 1 14 0c0 5-7 12-7 12z" />
-          <circle cx="12" cy="9" r="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span>地点</span>
-        {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
-      </button>
+    <>
+      <div className="pointer-events-auto flex flex-col items-end gap-2">
+        {/* 移动端触发按钮 */}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen((o) => !o)}
+          aria-expanded={drawerOpen}
+          aria-label={drawerOpen ? '关闭地点菜单' : '打开地点菜单'}
+          className="sm:hidden relative inline-flex h-11 min-w-[44px] items-center gap-1.5 rounded-2xl border border-white/[0.08] px-3 text-xs font-medium shadow-2xl backdrop-blur-md active:bg-white/5"
+          style={{ background: 'var(--panel)' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-7-7-12a7 7 0 1 1 14 0c0 5-7 12-7 12z" />
+            <circle cx="12" cy="9" r="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>地点</span>
+          {hasFilter && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />}
+        </button>
 
-      {/* 桌面端固定列表 */}
-      <div
-        className={`hidden sm:block w-[280px] max-h-[72dvh] overflow-y-auto rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md`}
-        style={{ background: 'var(--panel)' }}
-      >
-        {list}
-      </div>
-
-      {/* 移动端抽屉 */}
-      {drawerOpen && (
+        {/* 桌面端固定列表 */}
         <div
-          className="sm:hidden w-[86vw] max-w-[320px] max-h-[72dvh] overflow-y-auto rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md"
+          className="hidden sm:block w-[280px] max-h-[72dvh] overflow-y-auto rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md"
           style={{ background: 'var(--panel)' }}
         >
           {list}
         </div>
+      </div>
+
+      {/* 移动端底部 sheet：高于 VisibilityToggle(z-55)，低于 WrappedStory(z-65) / BootOverlay(z-70) */}
+      {drawerOpen && (
+        <div
+          className="sm:hidden pointer-events-auto fixed inset-0 z-[60]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="地点菜单"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDrawerOpen(false);
+          }}
+        >
+          {/* backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-[sheet-fade_200ms_ease-out_forwards]"
+            aria-hidden="true"
+          />
+          {/* sheet body：从底部滑起 */}
+          <div
+            className="absolute inset-x-0 bottom-0 flex max-h-[82dvh] flex-col rounded-t-2xl border-t border-white/[0.08] shadow-2xl overflow-hidden animate-[sheet-up_260ms_cubic-bezier(0.2,0.8,0.2,1)_forwards]"
+            style={{
+              background: 'var(--panel)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
+          >
+            {/* handle */}
+            <div className="flex items-center justify-center pt-2 pb-1">
+              <div className="h-1 w-10 rounded-full bg-white/25" aria-hidden="true" />
+            </div>
+            {/* header with close */}
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2">
+              <span className="text-xs font-medium text-text">国家和地区 · 城市</span>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="关闭"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-text-dim hover:text-text hover:bg-white/5"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain">{list}</div>
+          </div>
+
+          <style>{`
+            @keyframes sheet-up {
+              from { transform: translateY(100%); }
+              to { transform: translateY(0); }
+            }
+            @keyframes sheet-fade {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+          `}</style>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 

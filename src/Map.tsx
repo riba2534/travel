@@ -13,17 +13,18 @@ import {
   mergeWithCustom,
   type PopupRef,
 } from './state/theme-apply';
-import type { Places } from './lib/types';
+import type { Places, PointFC, TrackFC } from './lib/types';
+import { enrichPoint, renderPopupHtml } from './lib/point-enrich';
 
 interface Props {
   bbox: [number, number, number, number] | null;
   yearStart: number | null;
   yearEnd: number | null;
+  pointsData: PointFC;
+  trackData: TrackFC;
 }
 
 type PointFeature = GeoJSON.Feature<GeoJSON.Point, { t: number; ele?: number }>;
-type PointFC = GeoJSON.FeatureCollection<GeoJSON.Point, { t: number; ele?: number }>;
-type TrackFC = GeoJSON.FeatureCollection<GeoJSON.MultiLineString, Record<string, never>>;
 
 // ---- filter util ----
 function resolveFilterBounds(
@@ -105,38 +106,31 @@ function applyTrackFilter(all: TrackFC, filter: Filter, places: Places | null): 
 }
 
 // ---- event binding（每次 setStyle 后必须重绑）----
-function bindMapEvents(map: MLMap, popupRef: PopupRef): void {
-  // 点击点位（只在较高 zoom 时有意义，低 zoom 点太密 点击落在哪个点不确定，仍然允许点）
+interface MapEventCtx {
+  getPlaces: () => Places | null;
+  getAllPoints: () => PointFC | null;
+}
+
+function bindMapEvents(map: MLMap, popupRef: PopupRef, ctx: MapEventCtx): void {
   const onPointClick = (e: maplibregl.MapLayerMouseEvent) => {
     const f = e.features?.[0] as PointFeature | undefined;
     if (!f) return;
     const coords = f.geometry.coordinates.slice() as [number, number];
     const props = f.properties;
-    const date = new Date(props.t * 1000);
-    const dateStr = date.toLocaleString('zh-CN', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit',
-      timeZone: 'UTC',
-    });
-    const html = `
-      <div style="font-family:Inter,sans-serif;line-height:1.5;min-width:160px">
-        <div style="color:var(--text-dim,#71717A);font-size:11px;margin-bottom:4px">UTC 时间</div>
-        <div style="color:var(--text,#F4F4F5);font-size:13px;font-weight:500;margin-bottom:8px;font-variant-numeric:tabular-nums">${dateStr}</div>
-        <div style="display:grid;grid-template-columns:auto auto;gap:4px 12px;font-size:12px">
-          <span style="color:var(--text-dim,#71717A)">坐标</span>
-          <span style="color:var(--text,#F4F4F5);font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">${coords[1].toFixed(4)}, ${coords[0].toFixed(4)}</span>
-          ${props.ele !== undefined ? `<span style="color:var(--text-dim,#71717A)">海拔</span><span style="color:var(--text,#F4F4F5);font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">${props.ele} m</span>` : ''}
-        </div>
-      </div>`;
+    const info = enrichPoint(
+      { t: props.t, ele: props.ele, lon: coords[0], lat: coords[1] },
+      ctx.getPlaces(),
+      ctx.getAllPoints(),
+    );
     popupRef.current?.remove();
     popupRef.current = new Popup({ offset: 12, closeButton: true, closeOnClick: true })
       .setLngLat(coords)
-      .setHTML(html)
+      .setHTML(renderPopupHtml(info))
       .addTo(map);
   };
 
   map.on('click', 'points-core', onPointClick);
-  // zoom < 10 时 core 较小，叠击靠 glow 也能点到
+  // zoom < 10 时 core 较小，点击可能命中 glow 层
   map.on('click', 'points-glow', onPointClick);
 
   for (const layer of ['points-core', 'points-glow']) {
@@ -166,7 +160,7 @@ async function loadBaseStyle(theme: Theme): Promise<maplibregl.StyleSpecificatio
   }
 }
 
-export default function Map({ bbox, yearStart, yearEnd }: Props) {
+export default function Map({ bbox, yearStart, yearEnd, pointsData, trackData }: Props) {
   const layers = useAppStore((s) => s.layers);
   const filter = useAppStore((s) => s.filter);
   const places = useAppStore((s) => s.places);
@@ -209,19 +203,15 @@ export default function Map({ bbox, yearStart, yearEnd }: Props) {
       lastThemeIdRef.current = initTheme.id;
       applyThemeCssVars(initTheme);
 
-      const [baseStyle, pointsRes, trackRes] = await Promise.all([
-        loadBaseStyle(initTheme),
-        fetch('/data/points.geojson').then((r) => r.json()) as Promise<PointFC>,
-        fetch('/data/track.geojson').then((r) => r.json()) as Promise<TrackFC>,
-      ]);
+      const baseStyle = await loadBaseStyle(initTheme);
       if (cancelled || !mapEl.current) return;
 
-      allPointsRef.current = pointsRes;
-      allTrackRef.current = trackRes;
+      allPointsRef.current = pointsData;
+      allTrackRef.current = trackData;
 
       // 一次性把底图 + 自定义 layer 合并成完整 style
       const initLayers = useAppStore.getState().layers;
-      const fullStyle = mergeWithCustom(baseStyle, initTheme, initLayers, pointsRes, trackRes);
+      const fullStyle = mergeWithCustom(baseStyle, initTheme, initLayers, pointsData, trackData);
 
       const map = new maplibregl.Map({
         container: mapEl.current,
@@ -230,7 +220,7 @@ export default function Map({ bbox, yearStart, yearEnd }: Props) {
         zoom: 1.6,
         minZoom: 1,
         maxZoom: 18,
-        attributionControl: { compact: true },
+        attributionControl: false,
         cooperativeGestures: false,
         pitchWithRotate: false,
         dragRotate: false,
@@ -246,7 +236,10 @@ export default function Map({ bbox, yearStart, yearEnd }: Props) {
 
       map.on('load', () => {
         if (cancelled) return;
-        bindMapEvents(map, popupRef);
+        bindMapEvents(map, popupRef, {
+          getPlaces: () => useAppStore.getState().places,
+          getAllPoints: () => allPointsRef.current,
+        });
         // 应用年份/filter
         pushFilteredData(map);
 
@@ -358,7 +351,10 @@ export default function Map({ bbox, yearStart, yearEnd }: Props) {
       // setStyle 会触发 style.load，事件处理器会被清空需要重绑
       const onStyleLoad = () => {
         map.off('style.load', onStyleLoad);
-        bindMapEvents(map, popupRef);
+        bindMapEvents(map, popupRef, {
+          getPlaces: () => useAppStore.getState().places,
+          getAllPoints: () => allPointsRef.current,
+        });
         pushFilteredData(map);
       };
       map.on('style.load', onStyleLoad);

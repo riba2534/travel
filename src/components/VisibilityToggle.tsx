@@ -12,7 +12,7 @@ export default function VisibilityToggle() {
       aria-pressed={uiHidden}
       aria-label={uiHidden ? '显示界面' : '沉浸模式：隐藏所有界面'}
       title={uiHidden ? '显示界面 (Esc)' : '沉浸模式'}
-      className={`pointer-events-auto fixed z-[55] flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md transition-colors ${
+      className={`pointer-events-auto fixed z-[55] flex h-9 w-9 items-center justify-center rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md transition-colors ${
         uiHidden
           ? 'text-accent bg-black/40 hover:bg-black/60'
           : 'text-text-dim hover:text-text active:bg-white/5'
@@ -20,9 +20,10 @@ export default function VisibilityToggle() {
       style={{
         background: uiHidden ? 'rgba(0,0,0,0.5)' : 'var(--panel)',
         right: 'max(0.75rem, env(safe-area-inset-right))',
+        // uiHidden=true 独自在最底；uiHidden=false 时避让底部控件栏（移动端有 YearSlider，桌面有 bar）
         bottom: uiHidden
-          ? 'max(0.75rem, env(safe-area-inset-bottom))'
-          : 'calc(max(0.75rem, env(safe-area-inset-bottom)) + 3.5rem)',
+          ? 'var(--safe-bottom)'
+          : 'calc(var(--safe-bottom) + var(--h-bottom-bar))',
       }}
     >
       {uiHidden ? <EyeOffIcon /> : <EyeIcon />}

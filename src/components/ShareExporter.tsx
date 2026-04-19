@@ -4,7 +4,7 @@ import { useAppStore, type ShareOptions } from '../state/store';
 import { exportShare } from '../lib/share';
 
 const OPTIONS: { key: keyof ShareOptions; label: string; hint: string }[] = [
-  { key: 'title', label: '标题「我的足迹」', hint: '左上角大标题' },
+  { key: 'title', label: '标题「HPCのJourneys」', hint: '左上角大标题' },
   { key: 'stats', label: '关键统计', hint: 'km / 国家地区数 / 点数 / 年份' },
   { key: 'date', label: '生成日期', hint: '右下角小字' },
   { key: 'watermark', label: '域名水印', hint: '左下角小字' },
@@ -84,7 +84,7 @@ export default function ShareExporter() {
     const file = new File([blobRef.current], `footprint-${Date.now()}.png`, { type: 'image/png' });
     if (nav.canShare?.({ files: [file] }) && typeof nav.share === 'function') {
       try {
-        await nav.share({ files: [file], title: '我的足迹' });
+        await nav.share({ files: [file], title: 'HPCのJourneys' });
       } catch (e) {
         if ((e as DOMException)?.name !== 'AbortError') console.warn(e);
       }
@@ -165,7 +165,7 @@ export default function ShareExporter() {
           >
             <img
               src={previewUrl}
-              alt="我的足迹"
+              alt="HPCのJourneys"
               // iOS Safari 需要确认图片来源为可保存 blob URL
               className="max-h-[85vh] max-w-full rounded-lg shadow-2xl"
               style={{ objectFit: 'contain', WebkitTouchCallout: 'default' }}

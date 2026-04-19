@@ -1,10 +1,23 @@
 export type Mode = 'points' | 'heatmap';
 
+// 地图数据的 GeoJSON 形状（build-data 产出 + 运行时消费）
+export type PointFC = GeoJSON.FeatureCollection<GeoJSON.Point, { t: number; ele?: number }>;
+export type TrackFC = GeoJSON.FeatureCollection<GeoJSON.MultiLineString, Record<string, never>>;
+
 export interface City {
   name: string;
   lat: number;
   lon: number;
   count: number;
+}
+
+export interface YearStat {
+  year: number;
+  points: number;
+  km: number;
+  countries: string[];
+  topCities: City[];
+  farthestDay: { date: string; km: number } | null;
 }
 
 export interface Summary {
@@ -16,6 +29,7 @@ export interface Summary {
   kmTraveled: number;
   bbox: [number, number, number, number];
   topCities: City[];
+  yearStats?: YearStat[];
   generatedAt: string;
 }
 

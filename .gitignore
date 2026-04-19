@@ -15,6 +15,7 @@ vite.config.js
 
 # 截图临时目录
 /tmp-shots
+/.playwright-cli
 
 # 编辑器
 .vscode

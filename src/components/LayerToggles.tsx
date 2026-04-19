@@ -62,7 +62,7 @@ export default function LayerToggles() {
             aria-pressed={active}
             aria-label={`${active ? '隐藏' : '显示'}${t.label}`}
             onClick={() => toggle(t.key)}
-            className={`inline-flex h-10 min-w-[44px] items-center gap-1.5 rounded-xl px-2.5 sm:px-3 text-xs font-medium transition-all ${
+            className={`inline-flex h-9 sm:h-8 min-w-[40px] items-center gap-1.5 rounded-xl px-2 sm:px-2.5 text-xs font-medium transition-all ${
               active ? 'bg-accent text-bg shadow-md' : 'text-text-dim hover:text-text active:bg-white/5'
             }`}
             style={{ touchAction: 'manipulation' }}

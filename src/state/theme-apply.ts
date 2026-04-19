@@ -6,15 +6,13 @@ import type {
   SourceSpecification,
 } from 'maplibre-gl';
 import type { Theme } from './themes';
+import type { PointFC, TrackFC } from '../lib/types';
 
 export interface LayerState {
   points: boolean;
   heatmap: boolean;
   track: boolean;
 }
-
-type PointFC = GeoJSON.FeatureCollection<GeoJSON.Point, { t: number; ele?: number }>;
-type TrackFC = GeoJSON.FeatureCollection<GeoJSON.MultiLineString, Record<string, never>>;
 
 const vis = (v: boolean): 'visible' | 'none' => (v ? 'visible' : 'none');
 

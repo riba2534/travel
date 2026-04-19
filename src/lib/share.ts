@@ -108,7 +108,7 @@ async function renderWithOverlay(
     ctx.font = `600 ${px(56)}px Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
-    ctx.fillText('我的足迹', px(60), px(56));
+    ctx.fillText('HPCのJourneys', px(60), px(56));
   }
 
   // 标题下方：统计
@@ -174,7 +174,7 @@ export async function shareOrDownload(blob: Blob, filename: string): Promise<voi
   const nav = navigator as NavigatorShare;
   if (nav.canShare?.({ files: [file] }) && typeof nav.share === 'function') {
     try {
-      await nav.share({ files: [file], title: '我的足迹' });
+      await nav.share({ files: [file], title: 'HPCのJourneys' });
       return;
     } catch (e) {
       // 用户取消或不支持，继续走下载 fallback

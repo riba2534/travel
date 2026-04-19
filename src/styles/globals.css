@@ -3,15 +3,26 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  /* 默认主题 midnight 的值，应用启动后会被 theme-apply 覆盖 */
-  --bg: #0a0a0f;
-  --panel: rgba(15, 15, 20, 0.72);
+  color-scheme: light;
+  /* 默认主题 paper（轻纸）的值，应用启动后会被 theme-apply 覆盖 */
+  --bg: #f5f1ea;
+  --panel: rgba(255, 255, 255, 0.82);
   --surface: var(--panel); /* 兼容旧引用 */
-  --text: #f4f4f5;
-  --text-dim: #71717a;
-  --accent: #f59e0b;
-  --track: #22d3ee;
+  --text: #1f2937;
+  --text-dim: #6b7280;
+  --accent: #dc2626;
+  --track: #0369a1;
+
+  /* 底部浮层堆叠高度（App/VisibilityToggle 共用，避免魔法数漂移）
+     - safe-bottom：底部安全区
+     - h-bottom-bar：YearSlider 底栏占位高度（含自身 padding）
+     - gap-stack：堆叠两层之间的视觉间距
+     - h-control-row：移动端单行浮动控件（LayerToggles 或 FitAllButton）的高度
+  */
+  --safe-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  --h-bottom-bar: 4.25rem; /* 瘦身后的 YearSlider 外高 ~64-68px */
+  --gap-stack: 0.5rem;
+  --h-control-row: 2.75rem; /* LayerToggles 这种 p-1 容器的外高 ~44px */
 }
 
 html,
