@@ -54,6 +54,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          # 不传 --commit-message：commit message 多行会破坏 shell 解析
-          # Cloudflare 会通过 --commit-hash 自动从 GitHub 拉取消息
-          command: pages deploy dist --project-name=travel-map --branch=${{ github.head_ref || github.ref_name }} --commit-hash=${{ github.sha }} --commit-dirty=true
+          # 主动传 ASCII-only 的 commit-message（hash 本身），避免 CF 从 GitHub
+          # 拉取含中文/全角符号/箭头等字符时 API 报 code 8000111 Invalid commit message
+          command: pages deploy dist --project-name=travel-map --branch=${{ github.head_ref || github.ref_name }} --commit-hash=${{ github.sha }} --commit-message=deploy-${{ github.sha }} --commit-dirty=true
