@@ -74,7 +74,7 @@ export default function PlacesMenu() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索国家 / 城市"
+          placeholder="搜索国家地区 / 城市"
           className="w-full rounded-lg bg-white/5 px-2 py-1.5 text-xs text-text placeholder:text-text-dim focus:outline-none focus:ring-1 focus:ring-accent/50"
         />
         {hasFilter && (
@@ -102,7 +102,7 @@ export default function PlacesMenu() {
                 <span className="flex items-center gap-2">
                   <Chevron open={contOpen} />
                   <span className="font-medium text-text">{cont.name}</span>
-                  <span className="text-[10px] text-text-dim">{cont.countries.length} 国</span>
+                  <span className="text-[10px] text-text-dim">{cont.countries.length} 地</span>
                 </span>
                 <span className="font-mono tabular-nums text-[10px] text-text-dim">
                   {cont.count.toLocaleString()}
@@ -133,7 +133,14 @@ export default function PlacesMenu() {
                             onClick={() => onCountry(co)}
                             className="flex flex-1 items-center justify-between gap-2 px-1.5 py-1.5 text-left text-[11px] hover:bg-white/[0.04] rounded"
                           >
-                            <span className="truncate text-text">{co.name}</span>
+                            <span className="flex min-w-0 items-baseline gap-1.5">
+                              <span className="truncate text-text">{co.name}</span>
+                              {co.cities.length > 0 && (
+                                <span className="shrink-0 font-mono tabular-nums text-[10px] text-text-dim">
+                                  {co.cities.length} 城
+                                </span>
+                              )}
+                            </span>
                             <span className="shrink-0 font-mono tabular-nums text-[10px] text-accent/90">
                               {co.count.toLocaleString()}
                             </span>

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useAppStore } from '../state/store';
 import ThemePicker from './ThemePicker';
 import ShareExporter from './ShareExporter';
 
@@ -9,8 +8,7 @@ interface Props {
 }
 
 export default function SettingsPanel({ open, onClose }: Props) {
-  const setUiHidden = useAppStore((s) => s.setUiHidden);
-  const [tab, setTab] = useState<'theme' | 'share' | 'display'>('theme');
+  const [tab, setTab] = useState<'theme' | 'share'>('theme');
 
   if (!open) return null;
 
@@ -47,7 +45,6 @@ export default function SettingsPanel({ open, onClose }: Props) {
           {([
             ['theme', '主题'],
             ['share', '分享'],
-            ['display', '显示'],
           ] as const).map(([id, label]) => (
             <button
               key={id}
@@ -66,23 +63,6 @@ export default function SettingsPanel({ open, onClose }: Props) {
         <div className="p-4">
           {tab === 'theme' && <ThemePicker />}
           {tab === 'share' && <ShareExporter />}
-          {tab === 'display' && (
-            <div className="flex flex-col gap-3">
-              <p className="text-xs text-text-dim leading-relaxed">
-                隐藏所有界面元素，只保留地图和轨迹。按 <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono">Esc</kbd> 或点击右下角的小图标恢复。
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setUiHidden(true);
-                  onClose();
-                }}
-                className="w-full rounded-lg bg-accent/15 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/25 transition-colors"
-              >
-                进入沉浸模式
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </>

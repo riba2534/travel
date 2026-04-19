@@ -16,7 +16,7 @@ export default function Header({ summary }: { summary: Summary | null }) {
       {/* 统计 - 单行紧凑 */}
       <div className="flex items-end gap-3 sm:gap-5">
         <Stat value={summary?.totalPoints.toLocaleString() ?? '—'} label="足迹" />
-        <Stat value={summary ? String(summary.countries.length) : '—'} label="国家" />
+        <Stat value={summary ? String(summary.countries.length) : '—'} label="国家和地区" />
         <Stat value={summary?.kmTraveled.toLocaleString() ?? '—'} label="公里" />
         <Stat value={summary ? String(summary.years.length) : '—'} label="年" />
       </div>

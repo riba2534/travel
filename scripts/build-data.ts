@@ -9,8 +9,19 @@ import { lineString } from '@turf/helpers';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { feature as topoFeature } from 'topojson-client';
 import { createRequire } from 'node:module';
-import { knownCities } from './known-cities.js';
+import { knownCities as manualCities } from './known-cities.js';
 import { COUNTRY_META, CONTINENT_NAMES, getCountryMeta } from './country-meta.js';
+
+// 可选：Nominatim 反查生成的自动城市名。可能不存在（首次构建时）。
+type KnownCity = { name: string; lat: number; lon: number };
+let autoCities: KnownCity[] = [];
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  autoCities = (await import('./known-cities-auto.js')).autoCities as KnownCity[];
+} catch {
+  // 文件不存在：跳过。跑 `npx tsx scripts/fetch-city-names.ts` 可生成。
+}
+const knownCities: KnownCity[] = [...manualCities, ...autoCities];
 
 const require = createRequire(import.meta.url);
 const countries110 = require('world-atlas/countries-10m.json');
@@ -227,8 +238,16 @@ for (const p of pts) {
   const c = cellCountry.get(k);
   if (c) countryPointCount.set(c, (countryPointCount.get(c) ?? 0) + 1);
 }
-const countries = [...countryPointCount.keys()].sort();
-console.log(`  countries: ${countries.length} (${countries.slice(0, 12).join(', ')}${countries.length > 12 ? '...' : ''})`);
+// summary.countries 按 ISO 去重（港澳台统一算中国），这样 Header 统计符合"国家和地区"语义
+const _isoSet = new Set<string>();
+const countries: string[] = [];
+for (const engName of [...countryPointCount.keys()].sort()) {
+  const meta = getCountryMeta(engName);
+  if (_isoSet.has(meta.iso)) continue;
+  _isoSet.add(meta.iso);
+  countries.push(meta.zh || engName);
+}
+console.log(`  countries & regions: ${countries.length} (${countries.slice(0, 12).join(', ')}${countries.length > 12 ? '...' : ''})`);
 
 // 4.4 Top cities（0.5° 网格 + 已知城市最近邻）
 const grid = new Map<string, { lat: number; lon: number; count: number }>();
@@ -243,22 +262,40 @@ for (const p of pts) {
 }
 type City = { name: string; lat: number; lon: number; count: number };
 const cells: City[] = [];
+const unnamed: { lat: number; lon: number; count: number }[] = [];
+// 阈值 30：让点数较少的国家（印尼/韩国/美国）的城市也能浮现；太低会把飞行中的单格误认为城市
+const CITY_MIN_POINTS = 30;
 for (const [, v] of grid) {
-  if (v.count < 200) continue;
+  if (v.count < CITY_MIN_POINTS) continue;
   const cellLat = v.lat / v.count;
   const cellLon = v.lon / v.count;
+  // 过滤海上点（飞机航线聚合成的网格不应被当作城市）
+  let onLand = false;
+  for (const f of countriesFC.features) {
+    const bb = countryBBox.get(f.properties.name)!;
+    if (cellLon < bb[0] || cellLon > bb[2] || cellLat < bb[1] || cellLat > bb[3]) continue;
+    if (booleanPointInPolygon([cellLon, cellLat], f)) { onLand = true; break; }
+  }
+  if (!onLand) continue;
   // 找最近已知城市（< 0.8°）
   let best: { name: string; d: number } | null = null;
   for (const c of knownCities) {
     const d = Math.hypot(c.lat - cellLat, c.lon - cellLon);
     if (d < 0.8 && (!best || d < best.d)) best = { name: c.name, d };
   }
+  if (!best) unnamed.push({ lat: +cellLat.toFixed(4), lon: +cellLon.toFixed(4), count: v.count });
   cells.push({
     name: best?.name ?? `${cellLat.toFixed(2)}, ${cellLon.toFixed(2)}`,
     lat: +cellLat.toFixed(4),
     lon: +cellLon.toFixed(4),
     count: v.count,
   });
+}
+if (unnamed.length) {
+  console.log(`  ⚠ ${unnamed.length} grids without known-city match (add to scripts/known-cities.ts):`);
+  for (const u of unnamed.sort((a, b) => b.count - a.count)) {
+    console.log(`      { lat: ${u.lat}, lon: ${u.lon} },  // ${u.count} points`);
+  }
 }
 // 按 count 排序，去重同名（保留最大）
 const cityMap = new Map<string, City>();
@@ -293,30 +330,73 @@ for (const c of allCities) {
   citiesByCountry.get(cname)!.push(c);
 }
 
-// 按大洲聚合
+// 先按 ISO 聚合（港澳台映射到 CN 会合并）
+type CountryOut = {
+  code: string; name: string; nameEn: string;
+  bbox: [number, number, number, number];
+  count: number;
+  cities: City[];
+  continent: string;
+};
+const countryByIso = new Map<string, CountryOut>();
+const unknownCountries: string[] = [];
+for (const [engName, cnt] of countryPointCount) {
+  const meta = getCountryMeta(engName);
+  if (!COUNTRY_META[engName]) unknownCountries.push(engName);
+  const bbox = countryBBox.get(engName)!;
+  const cities = citiesByCountry.get(engName) ?? [];
+  const exist = countryByIso.get(meta.iso);
+  if (exist) {
+    exist.count += cnt;
+    exist.cities.push(...cities);
+    // 合并 bbox
+    exist.bbox = [
+      Math.min(exist.bbox[0], bbox[0]),
+      Math.min(exist.bbox[1], bbox[1]),
+      Math.max(exist.bbox[2], bbox[2]),
+      Math.max(exist.bbox[3], bbox[3]),
+    ];
+  } else {
+    countryByIso.set(meta.iso, {
+      code: meta.iso,
+      name: meta.zh,
+      nameEn: engName,
+      bbox,
+      count: cnt,
+      cities: [...cities],
+      continent: meta.continent,
+    });
+  }
+}
+
+// 再按大洲聚合
 interface PlaceContinentOut {
   code: string; name: string; nameEn: string;
   count: number;
   countries: { code: string; name: string; nameEn: string; bbox: [number, number, number, number]; count: number; cities: City[] }[];
 }
 const continentMap = new Map<string, PlaceContinentOut>();
-const unknownCountries: string[] = [];
-for (const [engName, cnt] of countryPointCount) {
-  const meta = getCountryMeta(engName);
-  if (!COUNTRY_META[engName]) unknownCountries.push(engName);
-  const contInfo = CONTINENT_NAMES[meta.continent] ?? CONTINENT_NAMES.XX;
-  if (!continentMap.has(meta.continent)) {
-    continentMap.set(meta.continent, { code: meta.continent, name: contInfo.name, nameEn: contInfo.nameEn, count: 0, countries: [] });
+for (const co of countryByIso.values()) {
+  const contInfo = CONTINENT_NAMES[co.continent] ?? CONTINENT_NAMES.XX;
+  if (!continentMap.has(co.continent)) {
+    continentMap.set(co.continent, { code: co.continent, name: contInfo.name, nameEn: contInfo.nameEn, count: 0, countries: [] });
   }
-  const cont = continentMap.get(meta.continent)!;
-  cont.count += cnt;
+  const cont = continentMap.get(co.continent)!;
+  cont.count += co.count;
+  // 城市：按 count 降序；同名城市 count 累加（港/澳 的城市可能和大陆同名这里没有，但做安全合并）
+  const cityMap = new Map<string, City>();
+  for (const c of co.cities) {
+    const ex = cityMap.get(c.name);
+    if (ex) ex.count += c.count;
+    else cityMap.set(c.name, { ...c });
+  }
   cont.countries.push({
-    code: meta.iso,
-    name: meta.zh,
-    nameEn: engName,
-    bbox: countryBBox.get(engName)!,
-    count: cnt,
-    cities: (citiesByCountry.get(engName) ?? []).sort((a, b) => b.count - a.count),
+    code: co.code,
+    name: co.name,
+    nameEn: co.nameEn,
+    bbox: co.bbox,
+    count: co.count,
+    cities: [...cityMap.values()].sort((a, b) => b.count - a.count),
   });
 }
 

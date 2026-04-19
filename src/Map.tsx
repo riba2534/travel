@@ -151,18 +151,19 @@ function bindMapEvents(map: MLMap, popupRef: PopupRef): void {
 
 async function loadBaseStyle(theme: Theme): Promise<maplibregl.StyleSpecification> {
   const url = basemapStyleUrl(theme.basemap);
-  if (url) {
-    try {
-      const r = await fetch(url, { mode: 'cors' });
-      if (!r.ok) throw new Error(`style ${r.status}`);
-      const raw = (await r.json()) as maplibregl.StyleSpecification;
-      return patchStyleForChinese(raw);
-    } catch (e) {
-      console.warn(`[map] ${theme.basemap} 加载失败，降级到 Carto:`, e);
-    }
+  try {
+    const r = await fetch(url, { mode: 'cors' });
+    if (!r.ok) throw new Error(`style ${r.status}`);
+    const raw = (await r.json()) as maplibregl.StyleSpecification;
+    return patchStyleForChinese(raw);
+  } catch (e) {
+    console.warn(`[map] ${theme.basemap} 加载失败，降级到 Carto raster（英文标签）:`, e);
+    const isLight =
+      theme.basemap === 'openfreemap-positron' ||
+      theme.basemap === 'openfreemap-bright' ||
+      theme.basemap === 'openfreemap-liberty';
+    return makeCartoRasterStyle(isLight ? 'voyager' : 'dark', theme.cssVars.bg);
   }
-  if (theme.basemap === 'carto-voyager') return makeCartoRasterStyle('voyager', theme.cssVars.bg);
-  return makeCartoRasterStyle('dark', theme.cssVars.bg);
 }
 
 export default function Map({ bbox, yearStart, yearEnd }: Props) {

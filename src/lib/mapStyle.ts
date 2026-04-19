@@ -4,25 +4,24 @@ import type { StyleSpecification, LayerSpecification } from 'maplibre-gl';
 export type BaseMapKind =
   | 'openfreemap-dark'
   | 'openfreemap-liberty'
-  | 'carto-dark'
-  | 'carto-voyager';
+  | 'openfreemap-positron'
+  | 'openfreemap-bright';
 
 export const DEFAULT_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
 
 // 兼容旧 import
 export const STYLE_URL = DEFAULT_STYLE_URL;
 
-const BASE_MAP_URLS: Partial<Record<BaseMapKind, string>> = {
+// 所有底图都用 vector tile（可动态中文化）。raster tile 的标签是烘焙的英文无法替换。
+const BASE_MAP_URLS: Record<BaseMapKind, string> = {
   'openfreemap-dark': 'https://tiles.openfreemap.org/styles/dark',
   'openfreemap-liberty': 'https://tiles.openfreemap.org/styles/liberty',
+  'openfreemap-positron': 'https://tiles.openfreemap.org/styles/positron',
+  'openfreemap-bright': 'https://tiles.openfreemap.org/styles/bright',
 };
 
-export function isVectorBasemap(kind: BaseMapKind): boolean {
-  return kind in BASE_MAP_URLS;
-}
-
-export function basemapStyleUrl(kind: BaseMapKind): string | null {
-  return BASE_MAP_URLS[kind] ?? null;
+export function basemapStyleUrl(kind: BaseMapKind): string {
+  return BASE_MAP_URLS[kind] ?? DEFAULT_STYLE_URL;
 }
 
 /** 返回中文优先的 text-field 表达式 */
@@ -60,9 +59,10 @@ export function patchStyleForChinese(style: StyleSpecification): StyleSpecificat
   };
 }
 
-/** Carto raster 兜底 style 工厂 */
+/** Carto raster 兜底 style 工厂。
+ * voyager 的 tile 路径需要 `rastertiles/` 前缀（无前缀 404）；dark_all 无需。 */
 export function makeCartoRasterStyle(kind: 'dark' | 'voyager', bgColor: string): StyleSpecification {
-  const baseUrl = kind === 'dark' ? 'dark_all' : 'voyager';
+  const baseUrl = kind === 'dark' ? 'dark_all' : 'rastertiles/voyager';
   return {
     version: 8,
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -90,23 +90,21 @@ export function makeCartoRasterStyle(kind: 'dark' | 'voyager', bgColor: string):
 /** 兜底：OpenFreeMap 失败时用 Carto Dark */
 export const fallbackDarkMatterStyle = makeCartoRasterStyle('dark', '#0A0A0F');
 
-/** 按主题底图类型加载 style（异步，需要联网） */
+/** 按主题底图类型加载 style（异步）。所有底图都是 vector tile + 中文化。 */
 export async function loadStyleForBasemap(
   kind: BaseMapKind,
   bgColor: string,
 ): Promise<StyleSpecification> {
   const url = basemapStyleUrl(kind);
-  if (url) {
-    try {
-      const r = await fetch(url, { mode: 'cors' });
-      if (!r.ok) throw new Error(`style ${r.status}`);
-      const raw = (await r.json()) as StyleSpecification;
-      return patchStyleForChinese(raw);
-    } catch (e) {
-      console.warn(`[map] ${kind} 加载失败，降级到 carto:`, e);
-    }
+  try {
+    const r = await fetch(url, { mode: 'cors' });
+    if (!r.ok) throw new Error(`style ${r.status}`);
+    const raw = (await r.json()) as StyleSpecification;
+    return patchStyleForChinese(raw);
+  } catch (e) {
+    console.warn(`[map] ${kind} 加载失败，降级到 carto raster（标签将为英文）:`, e);
+    // 兜底：至少让用户看到世界地图
+    const isLight = kind === 'openfreemap-positron' || kind === 'openfreemap-bright' || kind === 'openfreemap-liberty';
+    return makeCartoRasterStyle(isLight ? 'voyager' : 'dark', bgColor);
   }
-  // raster 系列 + 失败降级
-  if (kind === 'carto-voyager') return makeCartoRasterStyle('voyager', bgColor);
-  return makeCartoRasterStyle('dark', bgColor);
 }

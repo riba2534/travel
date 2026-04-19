@@ -4,8 +4,9 @@ import Header from './components/Header';
 import PlacesMenu from './components/PlacesMenu';
 import YearSlider from './components/YearSlider';
 import LayerToggles from './components/LayerToggles';
+import FitAllButton from './components/FitAllButton';
 import SettingsButton from './components/SettingsButton';
-import HiddenReveal from './components/HiddenReveal';
+import VisibilityToggle from './components/VisibilityToggle';
 import type { Places } from './lib/types';
 import { useAppStore } from './state/store';
 
@@ -47,7 +48,7 @@ export default function App() {
         yearEnd={yearEnd}
       />
 
-      <HiddenReveal />
+      <VisibilityToggle />
 
       {/* 浮窗层 - 不阻挡地图拖动 */}
       <div className={`pointer-events-none absolute inset-0 z-10 ${uiHidden ? 'hidden' : ''}`}>
@@ -80,6 +81,7 @@ export default function App() {
           }}
         >
           <LayerToggles />
+          <FitAllButton />
           <YearSlider
             years={summary?.years ?? []}
             perYear={summary?.perYear ?? {}}

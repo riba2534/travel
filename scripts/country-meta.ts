@@ -21,10 +21,11 @@ export const CONTINENT_NAMES: Record<string, { name: string; nameEn: string }> =
 
 export const COUNTRY_META: Record<string, CountryMeta> = {
   // 亚洲
+  // 中国大陆 + 港澳台在本项目里统一归为「中国」(CN)，在城市层级区分
   'China': { iso: 'CN', zh: '中国', continent: 'AS' },
-  'Hong Kong': { iso: 'HK', zh: '中国香港', continent: 'AS' },
-  'Macao': { iso: 'MO', zh: '中国澳门', continent: 'AS' },
-  'Taiwan': { iso: 'TW', zh: '中国台湾', continent: 'AS' },
+  'Hong Kong': { iso: 'CN', zh: '中国', continent: 'AS' },
+  'Macao': { iso: 'CN', zh: '中国', continent: 'AS' },
+  'Taiwan': { iso: 'CN', zh: '中国', continent: 'AS' },
   'Japan': { iso: 'JP', zh: '日本', continent: 'AS' },
   'South Korea': { iso: 'KR', zh: '韩国', continent: 'AS' },
   'North Korea': { iso: 'KP', zh: '朝鲜', continent: 'AS' },

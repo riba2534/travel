@@ -171,7 +171,7 @@ export const THEMES: Theme[] = [
         'rgba(17,24,39,0.9)',
       ),
     },
-    basemap: 'carto-voyager',
+    basemap: 'openfreemap-positron',
   },
   {
     id: 'mono',
@@ -196,7 +196,7 @@ export const THEMES: Theme[] = [
         'rgba(255,255,255,1)',
       ),
     },
-    basemap: 'carto-dark',
+    basemap: 'openfreemap-dark',
   },
 ];
 
