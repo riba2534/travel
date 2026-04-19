@@ -79,7 +79,7 @@ export const useAppStore = create<AppState>()(
       places: null,
       yearStart: null,
       yearEnd: null,
-      layers: { points: true, heatmap: false, track: true },
+      layers: { points: true, heatmap: false, track: false },
       filter: {},
       themeId: DEFAULT_THEME_ID,
       uiHidden: false,

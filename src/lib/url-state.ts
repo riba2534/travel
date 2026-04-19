@@ -17,7 +17,7 @@ export interface DecodedState {
   layers?: LayerVisibility;
 }
 
-const DEFAULT_LAYERS: LayerVisibility = { points: true, heatmap: false, track: true };
+const DEFAULT_LAYERS: LayerVisibility = { points: true, heatmap: false, track: false };
 
 /** 把状态编码为 hash 字符串（含前导 #，空字符串表示无需 hash）
  *  defaults.year*：和当前 yearStart/yearEnd 相等则视为"未筛选"，不写入 hash。
