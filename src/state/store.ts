@@ -27,7 +27,6 @@ export interface ShareOptions {
   title: boolean;
   stats: boolean;
   date: boolean;
-  watermark: boolean;
 }
 
 interface AppState {
@@ -61,7 +60,6 @@ const DEFAULT_SHARE_OPTS: ShareOptions = {
   title: true,
   stats: true,
   date: true,
-  watermark: false,
 };
 
 export const useAppStore = create<AppState>()(

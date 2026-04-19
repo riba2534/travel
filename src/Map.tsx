@@ -229,10 +229,8 @@ export default function Map({ bbox, yearStart, yearEnd, pointsData, trackData }:
       });
       mapInstance = map;
 
-      map.addControl(
-        new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }),
-        'bottom-left',
-      );
+      // 不再加 NavigationControl：桌面有滚轮 / 移动端有双指缩放，
+      // 左下位置会和 LayerToggles + FitAllButton 堆叠重叠
 
       map.on('load', () => {
         if (cancelled) return;

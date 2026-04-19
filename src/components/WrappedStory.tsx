@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { YearStat, PointFC } from '../lib/types';
+import type { Map as MLMap } from 'maplibre-gl';
+import type { YearStat, PointFC, Summary } from '../lib/types';
 import { useAppStore } from '../state/store';
-import WrappedMap from './WrappedMap';
+import WrappedMap, { type WrappedMapHandle } from './WrappedMap';
+import SharePreview from './SharePreview';
+import { exportShare } from '../lib/share';
+
+const SHARE_OPTS_YEAR = { title: true, stats: true, date: true } as const;
+const BOOST_GLOW_RADIUS = 14;
+const BOOST_CORE_RADIUS = 4;
+const BOOST_TRACK_GLOW = 8;
+const BOOST_TRACK_CORE = 3;
 
 interface Props {
   open: boolean;
@@ -106,8 +115,34 @@ function StoryCard({
   stat: YearStat;
   pointsData: PointFC | null;
 }) {
+  const summary = useAppStore((s) => s.summary);
   const loops = stat.km > 0 ? (stat.km / EARTH_CIRCUM_KM).toFixed(2) : '0';
   const maxCityCount = Math.max(...stat.topCities.map((c) => c.count), 1);
+
+  const mapHandleRef = useRef<WrappedMapHandle>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+
+  const onSaveImage = async () => {
+    if (!summary || !pointsData) return;
+    const map = mapHandleRef.current?.getMap();
+    if (!map) {
+      setSaveErr('地图尚未加载完成');
+      return;
+    }
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const blob = await generateYearShareImage(map, summary, pointsData, stat.year);
+      setPreviewBlob(blob);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="mx-auto flex max-w-[720px] flex-col gap-6">
       {/* Hero */}
@@ -127,9 +162,39 @@ function StoryCard({
           className="overflow-hidden rounded-2xl border border-white/[0.06]"
           style={{ background: 'var(--panel)' }}
         >
-          <div className="h-[260px] sm:h-[340px] w-full">
-            <WrappedMap pointsData={pointsData} year={stat.year} />
+          <div className="relative h-[260px] sm:h-[340px] w-full">
+            <WrappedMap ref={mapHandleRef} pointsData={pointsData} year={stat.year} />
+            {/* 保存为图按钮 */}
+            <button
+              type="button"
+              onClick={onSaveImage}
+              disabled={saving}
+              aria-label={`保存 ${stat.year} 年分享图`}
+              title="生成 1920×1080 分享图"
+              className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 backdrop-blur px-2.5 py-1 text-[11px] font-medium text-white hover:bg-black/75 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>{saving ? '生成中…' : '保存为图'}</span>
+            </button>
+            {/* loading overlay：share.ts 会把 map container 移屏，这里盖住避免视觉空白 */}
+            {saving && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
+                <div className="flex flex-col items-center gap-2 text-white/95 text-xs">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <span>正在生成 {stat.year} 年分享图…</span>
+                </div>
+              </div>
+            )}
           </div>
+          {saveErr && (
+            <div className="px-4 py-2 text-[11px] text-red-400 border-t border-white/[0.06]">
+              {saveErr}
+            </div>
+          )}
         </section>
       )}
 
@@ -170,10 +235,13 @@ function StoryCard({
         )}
       </section>
 
-      {/* TOP 5 城市 */}
+      {/* 去过的城市（全量） */}
       {stat.topCities.length > 0 && (
         <section className="rounded-2xl border border-white/[0.06] p-5 sm:p-6" style={{ background: 'var(--panel)' }}>
-          <div className="text-[11px] uppercase tracking-widest text-text-dim">常去的地方</div>
+          <div className="flex items-baseline justify-between">
+            <div className="text-[11px] uppercase tracking-widest text-text-dim">去过的城市</div>
+            <div className="font-mono tabular-nums text-[11px] text-text-dim">{stat.topCities.length} 座</div>
+          </div>
           <div className="mt-3 flex flex-col gap-2">
             {stat.topCities.map((c, idx) => {
               const pct = (c.count / maxCityCount) * 100;
@@ -227,6 +295,12 @@ function StoryCard({
       </section>
 
       <div className="h-4" />
+
+      <SharePreview
+        blob={previewBlob}
+        onClose={() => setPreviewBlob(null)}
+        filenamePrefix={`footprint-${stat.year}`}
+      />
     </div>
   );
 }
@@ -236,4 +310,54 @@ function formatDate(iso: string): string {
   const m = iso.match(/^(\d+)-(\d+)-(\d+)$/);
   if (!m) return iso;
   return `${+m[2]} 月 ${+m[3]} 日`;
+}
+
+/** 用 WrappedMap 的 MapLibre 实例导出该年分享图。
+ *  流程：计算当年 bbox → 临时放大点/轨迹半径（1920 分辨率下小半径看不清）→ exportShare → finally 还原。 */
+async function generateYearShareImage(
+  map: MLMap,
+  summary: Summary,
+  pointsData: PointFC,
+  year: number,
+): Promise<Blob> {
+  const startT = Math.floor(Date.UTC(year, 0, 1) / 1000);
+  const endT = Math.floor(Date.UTC(year + 1, 0, 1) / 1000);
+  const features = pointsData.features.filter(
+    (f) => f.properties.t >= startT && f.properties.t < endT,
+  );
+  if (features.length < 1) throw new Error('该年无足迹');
+
+  let minLat = 90;
+  let maxLat = -90;
+  let minLon = 180;
+  let maxLon = -180;
+  for (const f of features) {
+    const [lon, lat] = f.geometry.coordinates as [number, number];
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+  }
+  const bbox: [number, number, number, number] = [minLon, minLat, maxLon, maxLat];
+
+  // 备份 paint，临时放大
+  const before = {
+    pointsGlow: map.getPaintProperty('yr-points-glow', 'circle-radius'),
+    pointsCore: map.getPaintProperty('yr-points-core', 'circle-radius'),
+    trackGlow: map.getPaintProperty('yr-track-glow', 'line-width'),
+    trackCore: map.getPaintProperty('yr-track-core', 'line-width'),
+  };
+  map.setPaintProperty('yr-points-glow', 'circle-radius', BOOST_GLOW_RADIUS);
+  map.setPaintProperty('yr-points-core', 'circle-radius', BOOST_CORE_RADIUS);
+  map.setPaintProperty('yr-track-glow', 'line-width', BOOST_TRACK_GLOW);
+  map.setPaintProperty('yr-track-core', 'line-width', BOOST_TRACK_CORE);
+
+  try {
+    return await exportShare(map, summary, SHARE_OPTS_YEAR, { year, bbox });
+  } finally {
+    map.setPaintProperty('yr-points-glow', 'circle-radius', before.pointsGlow);
+    map.setPaintProperty('yr-points-core', 'circle-radius', before.pointsCore);
+    map.setPaintProperty('yr-track-glow', 'line-width', before.trackGlow);
+    map.setPaintProperty('yr-track-core', 'line-width', before.trackCore);
+  }
 }

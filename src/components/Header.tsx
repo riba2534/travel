@@ -23,10 +23,13 @@ export default function Header({ summary, pointsData }: HeaderProps) {
       <span className="h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
       <div className="flex items-baseline gap-2 sm:gap-3">
-        <Stat value={summary?.totalPoints.toLocaleString() ?? '—'} label="足迹" />
-        <Stat value={summary ? String(summary.countries.length) : '—'} label="地区" />
+        {/* 移动端只保留两个核心 Stat；桌面端四个全显 */}
         <Stat value={summary?.kmTraveled.toLocaleString() ?? '—'} label="km" />
-        <Stat value={summary ? String(summary.years.length) : '—'} label="年" />
+        <Stat value={summary ? String(summary.countries.length) : '—'} label="地区" />
+        <span className="hidden sm:inline-flex items-baseline gap-3">
+          <Stat value={summary?.totalPoints.toLocaleString() ?? '—'} label="足迹" />
+          <Stat value={summary ? String(summary.years.length) : '—'} label="年" />
+        </span>
       </div>
 
       {hasWrapped && (
@@ -35,7 +38,7 @@ export default function Header({ summary, pointsData }: HeaderProps) {
           onClick={() => setWrappedOpen(true)}
           aria-label="打开年度足迹报告"
           title="年度足迹报告"
-          className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-1.5 py-1 sm:px-2 sm:py-0.5 text-[10px] font-medium text-accent hover:bg-accent/20 transition-colors shrink-0"
+          className="wrapped-pill inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/15 px-2 py-1 sm:py-0.5 text-[10px] font-medium text-accent hover:bg-accent/25 transition-colors shrink-0"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M12 2L14.5 9h7.5l-6 4.5 2.3 7-7.3-5.4-7.3 5.4 2.3-7-6-4.5h7.5z" />
@@ -43,6 +46,17 @@ export default function Header({ summary, pointsData }: HeaderProps) {
           <span className="hidden sm:inline">年度报告</span>
         </button>
       )}
+
+      <style>{`
+        @keyframes wrapped-pill-pulse {
+          0%, 100% { filter: brightness(1); transform: scale(1); }
+          50% { filter: brightness(1.12); transform: scale(1.04); }
+        }
+        .wrapped-pill { animation: wrapped-pill-pulse 2.4s ease-in-out infinite; transform-origin: center; }
+        @media (prefers-reduced-motion: reduce) {
+          .wrapped-pill { animation: none; }
+        }
+      `}</style>
 
       <WrappedStory
         open={wrappedOpen}

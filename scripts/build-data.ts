@@ -420,6 +420,7 @@ type YearStat = {
   points: number;
   km: number;
   countries: string[];
+  citiesTotal: number;
   topCities: { name: string; lat: number; lon: number; count: number }[];
   farthestDay: { date: string; km: number } | null;
 };
@@ -495,7 +496,8 @@ const yearStats: YearStat[] = years.map((yr) => {
     if (!ex) yearCityMap.set(c.name, c);
     else ex.count += c.count;
   }
-  const topCitiesYear = [...yearCityMap.values()].sort((a, b) => b.count - a.count).slice(0, 5);
+  // 当年全量城市（按 count 降序），前端在 WrappedStory 里完整展示
+  const topCitiesYear = [...yearCityMap.values()].sort((a, b) => b.count - a.count);
 
   // 最远一天：按 UTC 日切分，取当天连续行走累计里程最长的一天（口径同年度 km，30min 断线）
   const byDay = new Map<string, typeof yearPts>();
@@ -524,6 +526,7 @@ const yearStats: YearStat[] = years.map((yr) => {
     points: yearPts.length,
     km: Math.round(kmYear),
     countries: [...yearIsoSet].sort(),
+    citiesTotal: yearCityMap.size,
     topCities: topCitiesYear,
     farthestDay,
   };
@@ -544,6 +547,7 @@ const summary = {
     +maxLon.toFixed(4),
     +maxLat.toFixed(4),
   ],
+  citiesTotal: allCities.length,
   topCities,
   yearStats,
   generatedAt: new Date().toISOString(),

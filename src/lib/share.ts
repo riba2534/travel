@@ -5,10 +5,18 @@ import type { ShareOptions } from '../state/store';
 const OUT_W = 1920;
 const OUT_H = 1080;
 
+export interface ExportContext {
+  /** 指定年份：标题加「· {year}」、stats 用 summary.yearStats 对应项 */
+  year?: number;
+  /** 覆盖 fitBounds 的 bbox（默认用 summary.bbox） */
+  bbox?: [number, number, number, number];
+}
+
 export async function exportShare(
   map: MLMap,
   summary: Summary,
   opts: ShareOptions,
+  exportCtx?: ExportContext,
 ): Promise<Blob> {
   const container = map.getContainer();
   const prev = {
@@ -38,8 +46,9 @@ export async function exportShare(
     } satisfies Partial<CSSStyleDeclaration>);
     map.resize();
 
+    const targetBbox = exportCtx?.bbox ?? summary.bbox;
     map.fitBounds(
-      [[summary.bbox[0], summary.bbox[1]], [summary.bbox[2], summary.bbox[3]]],
+      [[targetBbox[0], targetBbox[1]], [targetBbox[2], targetBbox[3]]],
       {
         padding: { top: 120, bottom: 120, left: 100, right: 100 },
         animate: false,
@@ -60,7 +69,7 @@ export async function exportShare(
     // 多等一帧保险
     await new Promise<void>((r) => requestAnimationFrame(() => r()));
 
-    const blob = await renderWithOverlay(map, summary, opts);
+    const blob = await renderWithOverlay(map, summary, opts, exportCtx);
     return blob;
   } finally {
     Object.assign(container.style, prev);
@@ -73,6 +82,7 @@ async function renderWithOverlay(
   map: MLMap,
   summary: Summary,
   opts: ShareOptions,
+  exportCtx?: ExportContext,
 ): Promise<Blob> {
   const srcCanvas = map.getCanvas();
   // MapLibre 渲染的 canvas.width 是 CSS 像素 × devicePixelRatio。
@@ -102,23 +112,38 @@ async function renderWithOverlay(
   // 所有文字/位置基于 1920 基准设计，渲染时乘 scale 保证高 DPI 清晰
   const px = (n: number) => Math.round(n * scale);
 
+  // 年度模式：优先从 summary.yearStats 里取对应年的数据
+  const yrStat = exportCtx?.year
+    ? summary.yearStats?.find((s) => s.year === exportCtx.year)
+    : undefined;
+
   // 左上：标题
   if (opts.title) {
     ctx.fillStyle = textColor;
     ctx.font = `600 ${px(56)}px Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
-    ctx.fillText('HPCのJourneys', px(60), px(56));
+    const title = exportCtx?.year
+      ? `HPCのJourneys · ${exportCtx.year}`
+      : 'HPCのJourneys';
+    ctx.fillText(title, px(60), px(56));
   }
 
   // 标题下方：统计
   if (opts.stats) {
     const parts: string[] = [];
-    parts.push(`${summary.kmTraveled.toLocaleString()} km`);
-    parts.push(`${summary.countries.length} 地`);
-    parts.push(`${summary.totalPoints.toLocaleString()} 点`);
-    if (summary.years.length) {
-      parts.push(`${summary.years[0]}–${summary.years[summary.years.length - 1]}`);
+    if (yrStat) {
+      parts.push(`${yrStat.km.toLocaleString()} km`);
+      parts.push(`${yrStat.citiesTotal} 城`);
+      parts.push(`${yrStat.points.toLocaleString()} 点`);
+      parts.push(`${yrStat.year} 年`);
+    } else {
+      parts.push(`${summary.kmTraveled.toLocaleString()} km`);
+      parts.push(`${summary.citiesTotal} 城`);
+      parts.push(`${summary.totalPoints.toLocaleString()} 点`);
+      if (summary.years.length) {
+        parts.push(`${summary.years[0]}–${summary.years[summary.years.length - 1]}`);
+      }
     }
     ctx.fillStyle = accentColor;
     ctx.font = `500 ${px(26)}px "JetBrains Mono", ui-monospace, monospace`;
@@ -128,40 +153,21 @@ async function renderWithOverlay(
     ctx.fillText(parts.join('  ·  '), px(60), px(yOffset));
   }
 
-  // 右下：日期
+  // 右下：日期（低调的小字，不抢画面）
   if (opts.date) {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     ctx.fillStyle = textDimColor;
-    ctx.font = `400 ${px(22)}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.font = `400 ${px(16)}px "JetBrains Mono", ui-monospace, monospace`;
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'right';
-    ctx.fillText(dateStr, outW - px(60), outH - px(36));
-  }
-
-  // 左下：域名/作者水印
-  if (opts.watermark) {
-    ctx.fillStyle = textDimColor;
-    ctx.font = `400 ${px(20)}px "JetBrains Mono", ui-monospace, monospace`;
-    ctx.textBaseline = 'bottom';
-    ctx.textAlign = 'left';
-    const domain = getDomain();
-    ctx.fillText(domain, px(60), outH - px(36));
+    ctx.fillText(dateStr, outW - px(48), outH - px(32));
   }
 
   return new Promise<Blob>((resolve, reject) => {
     out.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png', 1.0);
   });
-}
-
-function getDomain(): string {
-  if (typeof window === 'undefined') return 'my-footprint';
-  const host = window.location.hostname;
-  if (!host || host === 'localhost' || host.startsWith('127.') || host.startsWith('192.168.')) {
-    return 'my-footprint';
-  }
-  return host;
 }
 
 export async function shareOrDownload(blob: Blob, filename: string): Promise<void> {

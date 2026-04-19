@@ -16,6 +16,9 @@ export interface YearStat {
   points: number;
   km: number;
   countries: string[];
+  /** 当年去重后的城市总数 */
+  citiesTotal: number;
+  /** 当年去过的全部城市，按 count 降序（WrappedStory 完整渲染） */
   topCities: City[];
   farthestDay: { date: string; km: number } | null;
 }
@@ -28,6 +31,8 @@ export interface Summary {
   countries: string[];
   kmTraveled: number;
   bbox: [number, number, number, number];
+  /** 全量去重后的城市总数（不是 topCities.length） */
+  citiesTotal: number;
   topCities: City[];
   yearStats?: YearStat[];
   generatedAt: string;

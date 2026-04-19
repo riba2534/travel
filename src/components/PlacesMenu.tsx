@@ -187,13 +187,13 @@ export default function PlacesMenu() {
   return (
     <>
       <div className="pointer-events-auto flex flex-col items-end gap-2">
-        {/* 移动端触发按钮 */}
+        {/* 触发按钮（移动 + 桌面） */}
         <button
           type="button"
           onClick={() => setDrawerOpen((o) => !o)}
           aria-expanded={drawerOpen}
           aria-label={drawerOpen ? '关闭地点菜单' : '打开地点菜单'}
-          className="sm:hidden relative inline-flex h-11 min-w-[44px] items-center gap-1.5 rounded-2xl border border-white/[0.08] px-3 text-xs font-medium shadow-2xl backdrop-blur-md active:bg-white/5"
+          className="relative inline-flex h-10 sm:h-9 min-w-[44px] items-center gap-1.5 rounded-2xl border border-white/[0.08] px-3 text-xs font-medium shadow-2xl backdrop-blur-md active:bg-white/5 hover:bg-white/5 transition-colors"
           style={{ background: 'var(--panel)' }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
@@ -204,13 +204,15 @@ export default function PlacesMenu() {
           {hasFilter && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />}
         </button>
 
-        {/* 桌面端固定列表 */}
-        <div
-          className="hidden sm:block w-[280px] max-h-[72dvh] overflow-y-auto rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md"
-          style={{ background: 'var(--panel)' }}
-        >
-          {list}
-        </div>
+        {/* 桌面端下拉面板：drawerOpen 时显示在按钮下方 */}
+        {drawerOpen && (
+          <div
+            className="hidden sm:block w-[280px] max-h-[72dvh] overflow-y-auto rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md"
+            style={{ background: 'var(--panel)' }}
+          >
+            {list}
+          </div>
+        )}
       </div>
 
       {/* 移动端底部 sheet：高于 VisibilityToggle(z-55)，低于 WrappedStory(z-65) / BootOverlay(z-70) */}
