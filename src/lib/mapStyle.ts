@@ -1,10 +1,31 @@
-// OpenFreeMap dark vector tiles - 完全免费、无 key、无限速、支持多语言标签
-// 在运行时把所有 symbol layer 的 text-field 替换为 name:zh-Hans / name:zh / name 优先级
+// 多底图支持 + 中文化 + 兜底 style
 import type { StyleSpecification, LayerSpecification } from 'maplibre-gl';
 
-export const STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
+export type BaseMapKind =
+  | 'openfreemap-dark'
+  | 'openfreemap-liberty'
+  | 'carto-dark'
+  | 'carto-voyager';
 
-/** 返回中文优先的 text-field 表达式（zh-Hans → zh → 拼音 → 本地名） */
+export const DEFAULT_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
+
+// 兼容旧 import
+export const STYLE_URL = DEFAULT_STYLE_URL;
+
+const BASE_MAP_URLS: Partial<Record<BaseMapKind, string>> = {
+  'openfreemap-dark': 'https://tiles.openfreemap.org/styles/dark',
+  'openfreemap-liberty': 'https://tiles.openfreemap.org/styles/liberty',
+};
+
+export function isVectorBasemap(kind: BaseMapKind): boolean {
+  return kind in BASE_MAP_URLS;
+}
+
+export function basemapStyleUrl(kind: BaseMapKind): string | null {
+  return BASE_MAP_URLS[kind] ?? null;
+}
+
+/** 返回中文优先的 text-field 表达式 */
 function chineseTextField() {
   return [
     'coalesce',
@@ -39,26 +60,53 @@ export function patchStyleForChinese(style: StyleSpecification): StyleSpecificat
   };
 }
 
-/** 兜底降级 style：CartoDB DarkMatter raster（标签是本地语言，不理想但稳） */
-export const fallbackDarkMatterStyle: StyleSpecification = {
-  version: 8,
-  glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-  sources: {
-    'carto-dark': {
-      type: 'raster',
-      tiles: [
-        'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}@2x.png',
-        'https://cartodb-basemaps-b.global.ssl.fastly.net/dark_all/{z}/{x}/{y}@2x.png',
-      ],
-      tileSize: 256,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
-      maxzoom: 19,
+/** Carto raster 兜底 style 工厂 */
+export function makeCartoRasterStyle(kind: 'dark' | 'voyager', bgColor: string): StyleSpecification {
+  const baseUrl = kind === 'dark' ? 'dark_all' : 'voyager';
+  return {
+    version: 8,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources: {
+      'carto-raster': {
+        type: 'raster',
+        tiles: [
+          `https://basemaps.cartocdn.com/${baseUrl}/{z}/{x}/{y}@2x.png`,
+          `https://cartodb-basemaps-a.global.ssl.fastly.net/${baseUrl}/{z}/{x}/{y}@2x.png`,
+          `https://cartodb-basemaps-b.global.ssl.fastly.net/${baseUrl}/{z}/{x}/{y}@2x.png`,
+        ],
+        tileSize: 256,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
+        maxzoom: 19,
+      },
     },
-  },
-  layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#0A0A0F' } },
-    { id: 'carto', type: 'raster', source: 'carto-dark' },
-  ],
-};
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': bgColor } },
+      { id: 'carto', type: 'raster', source: 'carto-raster' },
+    ],
+  };
+}
+
+/** 兜底：OpenFreeMap 失败时用 Carto Dark */
+export const fallbackDarkMatterStyle = makeCartoRasterStyle('dark', '#0A0A0F');
+
+/** 按主题底图类型加载 style（异步，需要联网） */
+export async function loadStyleForBasemap(
+  kind: BaseMapKind,
+  bgColor: string,
+): Promise<StyleSpecification> {
+  const url = basemapStyleUrl(kind);
+  if (url) {
+    try {
+      const r = await fetch(url, { mode: 'cors' });
+      if (!r.ok) throw new Error(`style ${r.status}`);
+      const raw = (await r.json()) as StyleSpecification;
+      return patchStyleForChinese(raw);
+    } catch (e) {
+      console.warn(`[map] ${kind} 加载失败，降级到 carto:`, e);
+    }
+  }
+  // raster 系列 + 失败降级
+  if (kind === 'carto-voyager') return makeCartoRasterStyle('voyager', bgColor);
+  return makeCartoRasterStyle('dark', bgColor);
+}

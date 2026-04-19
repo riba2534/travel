@@ -4,12 +4,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0A0A0F',
-        surface: 'rgba(15,15,20,0.72)',
-        text: '#F4F4F5',
-        'text-dim': '#71717A',
-        accent: '#F59E0B',
-        track: '#22D3EE',
+        bg: 'var(--bg)',
+        surface: 'var(--panel)',
+        panel: 'var(--panel)',
+        text: 'var(--text)',
+        'text-dim': 'var(--text-dim)',
+        accent: 'var(--accent)',
+        track: 'var(--track)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

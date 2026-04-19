@@ -17,8 +17,8 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
 
   return (
     <div
-      className="pointer-events-auto flex-1 max-w-2xl rounded-2xl border border-white/[0.08] bg-surface px-3 sm:px-5 py-2.5 sm:py-3 shadow-2xl backdrop-blur-md"
-      style={{ background: 'rgba(15,15,20,0.72)' }}
+      className="pointer-events-auto flex-1 max-w-2xl rounded-2xl border border-white/[0.08] px-3 sm:px-5 py-2.5 sm:py-3 shadow-2xl backdrop-blur-md"
+      style={{ background: 'var(--panel)' }}
     >
       {/* 年份 + 数量条 */}
       <div className="mb-1.5 flex items-end justify-between gap-1">
@@ -31,8 +31,8 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
                 className="w-full rounded-sm transition-all"
                 style={{
                   height: `${Math.max(pct * 0.24, 2)}px`,
-                  background: inRange ? '#F59E0B' : 'rgba(245,158,11,0.2)',
-                  opacity: inRange ? 0.85 : 0.4,
+                  background: inRange ? 'var(--accent)' : 'var(--accent)',
+                  opacity: inRange ? 0.85 : 0.25,
                 }}
                 title={`${y}: ${(perYear[String(y)] ?? 0).toLocaleString()} 点`}
               />
@@ -51,7 +51,7 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
           style={{
             left: `${((start - min) / Math.max(max - min, 1)) * 100}%`,
             right: `${100 - ((end - min) / Math.max(max - min, 1)) * 100}%`,
-            background: '#F59E0B',
+            background: 'var(--accent)',
           }}
         />
         {/* 起始 */}
@@ -103,9 +103,9 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
           width: 22px;
           height: 22px;
           border-radius: 50%;
-          background: #F59E0B;
-          border: 2px solid #0A0A0F;
-          box-shadow: 0 2px 8px rgba(245,158,11,0.5);
+          background: var(--accent);
+          border: 2px solid var(--bg);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.45);
           cursor: pointer;
           pointer-events: auto;
         }
@@ -113,17 +113,17 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
           width: 22px;
           height: 22px;
           border-radius: 50%;
-          background: #F59E0B;
-          border: 2px solid #0A0A0F;
-          box-shadow: 0 2px 8px rgba(245,158,11,0.5);
+          background: var(--accent);
+          border: 2px solid var(--bg);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.45);
           cursor: pointer;
           pointer-events: auto;
         }
         .range-thumb::-webkit-slider-runnable-track { background: transparent; }
         .range-thumb::-moz-range-track { background: transparent; }
         .range-thumb:focus { outline: none; }
-        .range-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(245,158,11,0.3); }
-        .range-thumb:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(245,158,11,0.3); }
+        .range-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(255,255,255,0.2); }
+        .range-thumb:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(255,255,255,0.2); }
         @media (max-width: 640px) {
           .range-thumb::-webkit-slider-thumb { width: 26px; height: 26px; }
           .range-thumb::-moz-range-thumb { width: 26px; height: 26px; }

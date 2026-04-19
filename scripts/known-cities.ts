@@ -47,6 +47,13 @@ export const knownCities: { name: string; lat: number; lon: number }[] = [
   { name: '张家口', lat: 40.8245, lon: 114.8849 },
   { name: '保定', lat: 38.8740, lon: 115.4646 },
   { name: '廊坊', lat: 39.5378, lon: 116.6836 },
+  { name: '庆阳', lat: 35.734, lon: 107.638 },
+  { name: '九寨沟', lat: 33.262, lon: 103.923 },
+  { name: '松潘', lat: 32.6389, lon: 103.5981 },
+  { name: '阿坝', lat: 32.9059, lon: 101.7072 },
+  { name: '遂宁', lat: 30.5134, lon: 105.5713 },
+  { name: '南充', lat: 30.8373, lon: 106.1105 },
+  { name: '长白山', lat: 42.0067, lon: 128.0565 },
   // 港澳台
   { name: '香港', lat: 22.3193, lon: 114.1694 },
   { name: '澳门', lat: 22.1987, lon: 113.5439 },

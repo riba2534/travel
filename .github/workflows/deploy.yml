@@ -44,6 +44,7 @@ jobs:
           test -f dist/data/points.geojson || (echo "ERROR: points.geojson missing — 本地需先跑 npm run build:data 并提交 public/data/"; exit 1)
           test -f dist/data/track.geojson  || (echo "ERROR: track.geojson missing"; exit 1)
           test -f dist/data/summary.json   || (echo "ERROR: summary.json missing"; exit 1)
+          test -f dist/data/places.json    || (echo "ERROR: places.json missing — 本地需先跑 npm run build:data"; exit 1)
           echo "Data files OK:"
           ls -lh dist/data/
 

@@ -10,37 +10,97 @@ import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { feature as topoFeature } from 'topojson-client';
 import { createRequire } from 'node:module';
 import { knownCities } from './known-cities.js';
+import { COUNTRY_META, CONTINENT_NAMES, getCountryMeta } from './country-meta.js';
 
 const require = createRequire(import.meta.url);
-const countries110 = require('world-atlas/countries-50m.json');
+const countries110 = require('world-atlas/countries-10m.json');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const RAW = path.join(ROOT, 'raw/track.gpx');
+const RAW_GPX = path.join(ROOT, 'raw/track.gpx');
+const RAW_CSV = path.join(ROOT, 'raw/photos.csv');
 const OUT = path.join(ROOT, 'public/data');
 
-if (!fs.existsSync(RAW)) {
-  console.error(`✗ raw/track.gpx not found. Copy GPX into ${RAW}`);
-  process.exit(1);
-}
-
-console.log('→ reading GPX...');
-const gpx = fs.readFileSync(RAW, 'utf8');
-
-// ---------- 1. 流式正则解析（比 xmldom 快 10x）----------
 type Pt = { lat: number; lon: number; t: number; ele: number };
 const pts: Pt[] = [];
-const re = /<trkpt lat="([\d.\-]+)" lon="([\d.\-]+)">\s*<ele>([\d.\-]+)<\/ele>\s*<time>([^<]+)<\/time>/g;
-let m: RegExpExecArray | null;
-while ((m = re.exec(gpx)) !== null) {
-  pts.push({
-    lat: +(+m[1]).toFixed(5),
-    lon: +(+m[2]).toFixed(5),
-    ele: +(+m[3]).toFixed(1),
-    t: Math.floor(new Date(m[4]).getTime() / 1000),
-  });
+
+// ---------- 1a. GPX（主轨迹）----------
+if (fs.existsSync(RAW_GPX)) {
+  console.log('→ reading GPX...');
+  const gpx = fs.readFileSync(RAW_GPX, 'utf8');
+  const re = /<trkpt lat="([\d.\-]+)" lon="([\d.\-]+)">\s*<ele>([\d.\-]+)<\/ele>\s*<time>([^<]+)<\/time>/g;
+  let m: RegExpExecArray | null;
+  let gpxCount = 0;
+  while ((m = re.exec(gpx)) !== null) {
+    pts.push({
+      lat: +(+m[1]).toFixed(5),
+      lon: +(+m[2]).toFixed(5),
+      ele: +(+m[3]).toFixed(1),
+      t: Math.floor(new Date(m[4]).getTime() / 1000),
+    });
+    gpxCount++;
+  }
+  console.log(`  parsed ${gpxCount.toLocaleString()} GPX points`);
+} else {
+  console.warn(`  ⚠ ${RAW_GPX} not found, skipping`);
 }
-console.log(`  parsed ${pts.length.toLocaleString()} points`);
+
+// ---------- 1b. 照片定位 CSV ----------
+// 表头：dataTime,locType,longitude,latitude,heading,accuracy,speed,distance,isBackForeground,stepType,altitude
+if (fs.existsSync(RAW_CSV)) {
+  console.log('→ reading photo CSV...');
+  const csv = fs.readFileSync(RAW_CSV, 'utf8');
+  const lines = csv.split(/\r?\n/);
+  let csvCount = 0, skipped = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const cols = line.split(',');
+    if (cols.length < 11) { skipped++; continue; }
+    const t = +cols[0];
+    const lon = +cols[2];
+    const lat = +cols[3];
+    const ele = +cols[10];
+    // 基本 sanity
+    if (!Number.isFinite(t) || !Number.isFinite(lon) || !Number.isFinite(lat)) { skipped++; continue; }
+    if (lon === 0 && lat === 0) { skipped++; continue; }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) { skipped++; continue; }
+    pts.push({
+      lat: +lat.toFixed(5),
+      lon: +lon.toFixed(5),
+      ele: Number.isFinite(ele) ? +ele.toFixed(1) : 0,
+      t,
+    });
+    csvCount++;
+  }
+  console.log(`  parsed ${csvCount.toLocaleString()} CSV points (skipped ${skipped})`);
+}
+
+// ---------- 1c. 合并 + 排序 + 去重（相邻 1s 内 & 0.0001° 内视为同一点）----------
+pts.sort((a, b) => a.t - b.t);
+const dedup: Pt[] = [];
+const EPS = 0.0001;
+for (const p of pts) {
+  const prev = dedup[dedup.length - 1];
+  if (
+    prev &&
+    Math.abs(p.t - prev.t) <= 1 &&
+    Math.abs(p.lat - prev.lat) < EPS &&
+    Math.abs(p.lon - prev.lon) < EPS
+  ) {
+    continue;
+  }
+  dedup.push(p);
+}
+const removed = pts.length - dedup.length;
+pts.length = 0;
+pts.push(...dedup);
+console.log(`  merged total: ${pts.length.toLocaleString()} (dedup removed ${removed.toLocaleString()})`);
+
+if (pts.length === 0) {
+  console.error('✗ no points parsed. Put raw/track.gpx or raw/photos.csv');
+  process.exit(1);
+}
 
 // ---------- 2. points.geojson ----------
 const pointsFC = {
@@ -116,21 +176,59 @@ for (const line of lines) {
 }
 kmTraveled = Math.round(kmTraveled);
 
-// 4.3 国家识别
+// 4.3 国家识别（全量扫 + 网格去重 + bbox 预筛）
 console.log('→ detecting countries...');
 const countriesFC = topoFeature(countries110, countries110.objects.countries) as unknown as GeoJSON.FeatureCollection<GeoJSON.MultiPolygon | GeoJSON.Polygon, { name: string }>;
-const countrySet = new Set<string>();
-for (let i = 0; i < pts.length; i += 50) {
-  const p = pts[i];
+
+// 4.3.1 预计算 country bbox
+const countryBBox = new Map<string, [number, number, number, number]>();
+for (const f of countriesFC.features) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const visit = (coords: number[][]) => {
+    for (const c of coords) {
+      if (c[0] < minX) minX = c[0];
+      if (c[1] < minY) minY = c[1];
+      if (c[0] > maxX) maxX = c[0];
+      if (c[1] > maxY) maxY = c[1];
+    }
+  };
+  const geom = f.geometry;
+  if (geom.type === 'Polygon') geom.coordinates.forEach((ring) => visit(ring as number[][]));
+  else geom.coordinates.forEach((poly) => poly.forEach((ring) => visit(ring as number[][])));
+  countryBBox.set(f.properties.name, [minX, minY, maxX, maxY]);
+}
+
+// 4.3.2 0.1° × 0.1° 网格去重坐标
+const CELL = 0.1;
+const cellPoint = new Map<string, Pt>();
+for (const p of pts) {
+  const k = `${Math.round(p.lon / CELL)},${Math.round(p.lat / CELL)}`;
+  if (!cellPoint.has(k)) cellPoint.set(k, p);
+}
+console.log(`  unique cells: ${cellPoint.size.toLocaleString()}`);
+
+// 4.3.3 每个 cell 做 bbox-predicated PIP
+const cellCountry = new Map<string, string>();
+for (const [k, p] of cellPoint) {
   for (const f of countriesFC.features) {
+    const bb = countryBBox.get(f.properties.name)!;
+    if (p.lon < bb[0] || p.lon > bb[2] || p.lat < bb[1] || p.lat > bb[3]) continue;
     if (booleanPointInPolygon([p.lon, p.lat], f)) {
-      if (f.properties?.name) countrySet.add(f.properties.name);
+      cellCountry.set(k, f.properties.name);
       break;
     }
   }
 }
-const countries = [...countrySet].sort();
-console.log(`  countries: ${countries.length} (${countries.slice(0, 8).join(', ')}...)`);
+
+// 4.3.4 原始点 → 国家（通过 cell 反查）
+const countryPointCount = new Map<string, number>();
+for (const p of pts) {
+  const k = `${Math.round(p.lon / CELL)},${Math.round(p.lat / CELL)}`;
+  const c = cellCountry.get(k);
+  if (c) countryPointCount.set(c, (countryPointCount.get(c) ?? 0) + 1);
+}
+const countries = [...countryPointCount.keys()].sort();
+console.log(`  countries: ${countries.length} (${countries.slice(0, 12).join(', ')}${countries.length > 12 ? '...' : ''})`);
 
 // 4.4 Top cities（0.5° 网格 + 已知城市最近邻）
 const grid = new Map<string, { lat: number; lon: number; count: number }>();
@@ -169,10 +267,73 @@ for (const c of cells.sort((a, b) => b.count - a.count)) {
   if (!ex) cityMap.set(c.name, c);
   else ex.count += c.count;
 }
-const topCities = [...cityMap.values()].sort((a, b) => b.count - a.count).slice(0, 12);
+const allCities = [...cityMap.values()].sort((a, b) => b.count - a.count);
+const topCities = allCities.slice(0, 12);
 console.log(`  top cities: ${topCities.slice(0, 5).map((c) => `${c.name}(${c.count})`).join(', ')}`);
 
-// 4.5 写文件
+// 4.5 places.json（大洲 → 国家 → 城市 层级）
+console.log('→ building places.json...');
+
+// city → country（bbox 预筛 PIP）
+function cityCountry(lat: number, lon: number): string | null {
+  for (const f of countriesFC.features) {
+    const bb = countryBBox.get(f.properties.name)!;
+    if (lon < bb[0] || lon > bb[2] || lat < bb[1] || lat > bb[3]) continue;
+    if (booleanPointInPolygon([lon, lat], f)) return f.properties.name;
+  }
+  return null;
+}
+
+// 按国家聚合城市（保留全部 allCities，展示上限由前端决定）
+const citiesByCountry = new Map<string, City[]>();
+for (const c of allCities) {
+  const cname = cityCountry(c.lat, c.lon);
+  if (!cname) continue;
+  if (!citiesByCountry.has(cname)) citiesByCountry.set(cname, []);
+  citiesByCountry.get(cname)!.push(c);
+}
+
+// 按大洲聚合
+interface PlaceContinentOut {
+  code: string; name: string; nameEn: string;
+  count: number;
+  countries: { code: string; name: string; nameEn: string; bbox: [number, number, number, number]; count: number; cities: City[] }[];
+}
+const continentMap = new Map<string, PlaceContinentOut>();
+const unknownCountries: string[] = [];
+for (const [engName, cnt] of countryPointCount) {
+  const meta = getCountryMeta(engName);
+  if (!COUNTRY_META[engName]) unknownCountries.push(engName);
+  const contInfo = CONTINENT_NAMES[meta.continent] ?? CONTINENT_NAMES.XX;
+  if (!continentMap.has(meta.continent)) {
+    continentMap.set(meta.continent, { code: meta.continent, name: contInfo.name, nameEn: contInfo.nameEn, count: 0, countries: [] });
+  }
+  const cont = continentMap.get(meta.continent)!;
+  cont.count += cnt;
+  cont.countries.push({
+    code: meta.iso,
+    name: meta.zh,
+    nameEn: engName,
+    bbox: countryBBox.get(engName)!,
+    count: cnt,
+    cities: (citiesByCountry.get(engName) ?? []).sort((a, b) => b.count - a.count),
+  });
+}
+
+const places = {
+  version: 1,
+  generatedAt: new Date().toISOString(),
+  continents: [...continentMap.values()]
+    .map((c) => ({ ...c, countries: c.countries.sort((a, b) => b.count - a.count) }))
+    .sort((a, b) => b.count - a.count),
+};
+
+if (unknownCountries.length > 0) {
+  console.log(`  ⚠ no meta for ${unknownCountries.length} countries: ${unknownCountries.join(', ')}`);
+}
+console.log(`  continents: ${places.continents.length}, total countries: ${places.continents.reduce((s, c) => s + c.countries.length, 0)}`);
+
+// 4.6 写文件
 const summary = {
   totalPoints: pts.length,
   segments: segments.length,
@@ -195,9 +356,11 @@ if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'points.geojson'), JSON.stringify(pointsFC));
 fs.writeFileSync(path.join(OUT, 'track.geojson'), JSON.stringify(trackFC));
 fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify(summary, null, 2));
+fs.writeFileSync(path.join(OUT, 'places.json'), JSON.stringify(places, null, 2));
 
 const sz = (p: string) => (fs.statSync(p).size / 1024).toFixed(1) + ' KB';
 console.log(`\n✓ wrote:`);
 console.log(`  points.geojson  ${sz(path.join(OUT, 'points.geojson'))}`);
 console.log(`  track.geojson   ${sz(path.join(OUT, 'track.geojson'))}`);
 console.log(`  summary.json    ${sz(path.join(OUT, 'summary.json'))}`);
+console.log(`  places.json     ${sz(path.join(OUT, 'places.json'))}`);
