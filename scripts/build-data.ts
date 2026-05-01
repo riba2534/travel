@@ -105,7 +105,7 @@ for (const p of pts) {
 }
 const removed = pts.length - dedup.length;
 pts.length = 0;
-pts.push(...dedup);
+for (const p of dedup) pts.push(p);
 console.log(`  merged total: ${pts.length.toLocaleString()} (dedup removed ${removed.toLocaleString()})`);
 
 if (pts.length === 0) {
