@@ -229,6 +229,27 @@ export default function Map({ bbox, yearStart, yearEnd, pointsData, trackData }:
       });
       mapInstance = map;
 
+      // macOS 触控板手势：双指移动 = pan，双指张合 = zoom
+      // 浏览器规范：trackpad 张合会合成为 ctrl+wheel；自由双指移动则是普通 wheel。
+      // Cmd+滚轮也走 zoom 分支，便于鼠标用户精确缩放。
+      map.scrollZoom.disable();
+      const wheelEl = map.getCanvasContainer();
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          const rect = wheelEl.getBoundingClientRect();
+          const around = map.unproject([e.clientX - rect.left, e.clientY - rect.top]);
+          map.easeTo({
+            zoom: map.getZoom() - e.deltaY * 0.01,
+            around,
+            duration: 0,
+          });
+        } else {
+          map.panBy([e.deltaX, e.deltaY], { duration: 0 });
+        }
+      };
+      wheelEl.addEventListener('wheel', onWheel, { passive: false });
+
       // 不再加 NavigationControl：桌面有滚轮 / 移动端有双指缩放，
       // 左下位置会和 LayerToggles + FitAllButton 堆叠重叠
 
