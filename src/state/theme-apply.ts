@@ -113,6 +113,7 @@ export function mergeWithCustom(
 /** 把主题 CSS vars 应用到 <html>，并更新 meta[theme-color]。 */
 export function applyThemeCssVars(theme: Theme): void {
   const r = document.documentElement.style;
+  document.documentElement.dataset.themeMode = theme.mode;
   r.setProperty('--bg', theme.cssVars.bg);
   r.setProperty('--panel', theme.cssVars.panel);
   r.setProperty('--text', theme.cssVars.text);

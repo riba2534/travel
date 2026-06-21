@@ -7,7 +7,7 @@ export default function ThemePicker() {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[11px] text-text-dim">选择一套主题，实时生效。</p>
+      <p className="text-[11px] leading-relaxed text-text-dim">选择地图和控件的整体气质，切换后会实时应用。</p>
       <div className="grid grid-cols-2 gap-2">
         {THEMES.map((t) => {
           const sw = themeSwatch(t);
@@ -18,16 +18,16 @@ export default function ThemePicker() {
               type="button"
               onClick={() => setTheme(t.id)}
               aria-pressed={active}
-              className={`flex items-center gap-3 rounded-xl border p-2 text-left transition-all ${
+              className={`flex min-h-[64px] items-center gap-3 rounded-md border p-2 text-left transition-all ${
                 active
                   ? 'border-accent bg-accent/10'
-                  : 'border-white/[0.06] hover:border-white/[0.15] hover:bg-white/[0.03]'
+                  : 'border-[var(--ui-border)] hover:border-[var(--ui-border-strong)] hover:bg-[var(--ui-hover)]'
               }`}
             >
               <div
-                className="h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-white/10"
+                className="h-9 w-9 shrink-0 overflow-hidden rounded-md border"
                 aria-hidden="true"
-                style={{ background: sw.bg }}
+                style={{ background: sw.bg, borderColor: 'var(--ui-border)' }}
               >
                 <div className="flex h-full items-end gap-[2px] p-[3px]">
                   <span className="flex-1 rounded-sm" style={{ background: sw.accent, height: '60%' }} />

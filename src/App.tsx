@@ -32,12 +32,17 @@ export default function App() {
 
   const [geoData, setGeoData] = useState<{ points: PointFC; track: TrackFC } | null>(null);
   const [progress, setProgress] = useState({ loaded: 0, total: 0, ratio: 0, done: false });
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const hashAppliedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadData() {
+      setDataError(null);
+      setGeoData(null);
+      setProgress({ loaded: 0, total: 0, ratio: 0, done: false });
       const manifestUrl = dataManifestUrl();
       const manifest = await streamFetchJson<DataManifest>(manifestUrl);
       const dataUrls = resolveDataUrls(manifest, manifestUrl);
@@ -52,6 +57,7 @@ export default function App() {
       ]);
 
       if (!cancelled) {
+        setDataError(null);
         setSummary(s);
         setPlaces(p);
         setGeoData({ points: pts, track: tr });
@@ -62,13 +68,14 @@ export default function App() {
       .catch((e) => {
         if (cancelled) return;
         console.error('加载数据失败', e);
+        setDataError(e instanceof Error ? e.message : String(e));
         setProgress({ loaded: 0, total: 0, ratio: 0, done: true });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [setSummary, setPlaces]);
+  }, [setSummary, setPlaces, loadAttempt]);
 
   // ESC 键复原 UI
   useEffect(() => {
@@ -155,6 +162,8 @@ export default function App() {
         total={progress.total}
         ratio={progress.ratio}
         done={progress.done && geoData !== null}
+        error={dataError}
+        onRetry={() => setLoadAttempt((n) => n + 1)}
       />
 
       <VisibilityToggle />
@@ -181,23 +190,21 @@ export default function App() {
           <PlacesMenu />
         </div>
 
-        {/* 移动端：YearSlider 上方一行工具条（与右下 VisibilityToggle 同底） */}
+        {/* 移动端：YearSlider 上方的单手 dock */}
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 flex sm:hidden items-center justify-between gap-2 px-3"
+          className="pointer-events-none absolute inset-x-0 bottom-0 flex sm:hidden justify-center px-3"
           style={{
             paddingBottom: 'calc(var(--safe-bottom) + var(--h-bottom-bar))',
             paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
-            // 右边留出 VisibilityToggle 宽度（h-9 = 2.25rem）+ gap
             paddingRight: 'calc(max(0.75rem, env(safe-area-inset-right)) + 2.25rem + var(--gap-stack))',
           }}
         >
-          <div className="pointer-events-auto flex items-center gap-2">
-            <LayerToggles />
-            <FitAllButton />
-          </div>
-          <div className="pointer-events-auto flex items-center gap-2">
-            <ShareButton />
-            <SettingsButton />
+          <div className="pointer-events-auto mobile-command-dock flex items-center gap-1 p-1">
+            <LayerToggles variant="dock" />
+            <FitAllButton variant="dock" />
+            <div className="mx-1 h-6 w-px bg-current opacity-10" aria-hidden="true" />
+            <ShareButton variant="dock" />
+            <SettingsButton variant="dock" />
           </div>
         </div>
 

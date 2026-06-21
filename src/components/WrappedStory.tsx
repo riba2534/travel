@@ -6,6 +6,7 @@ import { useAppStore } from '../state/store';
 import WrappedMap, { type WrappedMapHandle } from './WrappedMap';
 import SharePreview from './SharePreview';
 import { exportShare } from '../lib/share';
+import { useDialogFocus } from '../lib/use-dialog-focus';
 
 // 年度分享图自带 WrappedMap 实例并自管 yr-* layer；show* 字段在 exportShare 里通过
 // layerIds: {} 短路掉，此处值仅为满足类型契约
@@ -43,19 +44,11 @@ export default function WrappedStory({ open, onClose, pointsData }: Props) {
   }, [yearStats]);
 
   const [selected, setSelected] = useState<number | null>(null);
+  const dialogRef = useDialogFocus<HTMLDivElement>(open, onClose);
 
   useEffect(() => {
     if (open && selected === null && defaultYear !== null) setSelected(defaultYear);
   }, [open, selected, defaultYear]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
 
   if (!open || yearStats.length === 0) return null;
 
@@ -63,23 +56,25 @@ export default function WrappedStory({ open, onClose, pointsData }: Props) {
 
   const content = (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="年度足迹报告"
+      tabIndex={-1}
       className="fixed inset-0 z-[65] flex flex-col overflow-hidden"
       style={{ background: 'var(--bg)' }}
     >
       {/* 顶部 bar */}
       <div
-        className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-4 py-3"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+        className="flex shrink-0 items-center justify-between border-b px-4 py-3"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))', borderColor: 'var(--ui-border)' }}
       >
-        <div className="text-sm font-medium text-text">年度足迹报告</div>
+        <div className="text-sm font-semibold text-text">年度足迹报告</div>
         <button
           type="button"
           onClick={onClose}
           aria-label="关闭年度报告"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-text-dim hover:text-text hover:bg-white/5"
+          className="control-button flex h-9 w-9 items-center justify-center"
         >
           ✕
         </button>
@@ -96,7 +91,7 @@ export default function WrappedStory({ open, onClose, pointsData }: Props) {
                 type="button"
                 onClick={() => setSelected(y.year)}
                 aria-pressed={active}
-                className={`rounded-lg px-3 py-1.5 text-xs font-mono tabular-nums transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-xs font-mono tabular-nums transition-colors ${
                   active ? 'bg-accent text-bg' : 'text-text-dim hover:text-text hover:bg-white/[0.04]'
                 }`}
               >
@@ -168,8 +163,7 @@ function StoryCard({
       {/* 当年地图 */}
       {pointsData && stat.points > 0 && (
         <section
-          className="overflow-hidden rounded-2xl border border-white/[0.06]"
-          style={{ background: 'var(--panel)' }}
+          className="control-surface-strong overflow-hidden"
         >
           <div className="relative h-[260px] sm:h-[340px] w-full">
             <WrappedMap ref={mapHandleRef} pointsData={pointsData} year={stat.year} />
@@ -208,7 +202,7 @@ function StoryCard({
       )}
 
       {/* 里程 */}
-      <section className="rounded-2xl border border-white/[0.06] p-5 sm:p-6" style={{ background: 'var(--panel)' }}>
+      <section className="control-surface-strong p-5 sm:p-6">
         <div className="text-[11px] uppercase tracking-widest text-text-dim">路程</div>
         <div className="mt-2 flex items-baseline gap-2">
           <span className="font-mono tabular-nums text-4xl font-semibold text-text sm:text-5xl">
@@ -222,7 +216,7 @@ function StoryCard({
       </section>
 
       {/* 国家和地区 */}
-      <section className="rounded-2xl border border-white/[0.06] p-5 sm:p-6" style={{ background: 'var(--panel)' }}>
+      <section className="control-surface-strong p-5 sm:p-6">
         <div className="text-[11px] uppercase tracking-widest text-text-dim">足迹所至</div>
         <div className="mt-2 flex items-baseline gap-2">
           <span className="font-mono tabular-nums text-4xl font-semibold text-text sm:text-5xl">
@@ -235,7 +229,8 @@ function StoryCard({
             {stat.countries.map((c) => (
               <span
                 key={c}
-                className="rounded-full border border-white/[0.06] bg-white/[0.04] px-2.5 py-1 text-xs text-text"
+                className="rounded-full border px-2.5 py-1 text-xs text-text"
+                style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-hover)' }}
               >
                 {c}
               </span>
@@ -246,7 +241,7 @@ function StoryCard({
 
       {/* 去过的城市（全量） */}
       {stat.topCities.length > 0 && (
-        <section className="rounded-2xl border border-white/[0.06] p-5 sm:p-6" style={{ background: 'var(--panel)' }}>
+        <section className="control-surface-strong p-5 sm:p-6">
           <div className="flex items-baseline justify-between">
             <div className="text-[11px] uppercase tracking-widest text-text-dim">去过的城市</div>
             <div className="font-mono tabular-nums text-[11px] text-text-dim">{stat.topCities.length} 座</div>
@@ -282,7 +277,7 @@ function StoryCard({
 
       {/* 最远一天 */}
       {stat.farthestDay && stat.farthestDay.km > 0 && (
-        <section className="rounded-2xl border border-white/[0.06] p-5 sm:p-6" style={{ background: 'var(--panel)' }}>
+        <section className="control-surface-strong p-5 sm:p-6">
           <div className="text-[11px] uppercase tracking-widest text-text-dim">走得最远的一天</div>
           <div className="mt-2 flex items-baseline gap-3 flex-wrap">
             <span className="font-mono tabular-nums text-2xl font-semibold text-text">
@@ -296,7 +291,7 @@ function StoryCard({
       )}
 
       {/* 轨迹点数 */}
-      <section className="flex items-center justify-between rounded-2xl border border-white/[0.06] px-5 py-3 sm:px-6" style={{ background: 'var(--panel)' }}>
+      <section className="control-surface-strong flex items-center justify-between px-5 py-3 sm:px-6">
         <div className="text-[11px] uppercase tracking-widest text-text-dim">轨迹点数</div>
         <div className="font-mono tabular-nums text-lg font-semibold text-text">
           {stat.points.toLocaleString()}

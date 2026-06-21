@@ -22,7 +22,7 @@ export default function ShareSettings() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[11px] text-text-dim leading-relaxed">
-        设置点击底栏「分享」按钮时要渲染的内容。一般用默认即可，只在需要调整时改这里。
+        设置点击底栏分享按钮时渲染的内容。默认适合直接保存或发社交平台。
       </p>
 
       <Group title="地图图层" opts={LAYER_OPTS} values={shareOpts} onChange={setShareOpt} />
@@ -44,17 +44,17 @@ function Group({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-[10px] uppercase tracking-wider text-text-dim mb-1">{title}</div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-text-dim">{title}</div>
       {opts.map(({ key, label, hint }) => (
         <label
           key={String(key)}
-          className="flex items-start gap-2 rounded-lg px-2 py-1.5 cursor-pointer hover:bg-white/[0.04]"
+          className="flex min-h-11 cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-[var(--ui-hover)]"
         >
           <input
             type="checkbox"
             checked={values[key]}
             onChange={(e) => onChange(key, e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent accent-accent"
+            className="mt-0.5 h-4 w-4 rounded border-[var(--ui-border)] bg-transparent accent-accent"
           />
           <div className="flex-1 min-w-0">
             <div className="text-xs text-text">{label}</div>

@@ -197,7 +197,7 @@ async function renderWithOverlay(
     if (exportCtx?.year) {
       // 年度模式 Hero 翻转：大 year + 品牌副线
       ctx.fillStyle = accentColor;
-      ctx.font = `800 ${px(124)}px "JetBrains Mono", ui-monospace, monospace`;
+      ctx.font = `800 ${px(124)}px "SFMono-Regular", "Cascadia Mono", ui-monospace, monospace`;
       ctx.textBaseline = 'top';
       ctx.textAlign = 'left';
       ctx.fillText(String(exportCtx.year), TITLE_X, cursorY);
@@ -211,13 +211,13 @@ async function renderWithOverlay(
 
       // 品牌副线
       ctx.fillStyle = textDimColor;
-      ctx.font = `500 ${px(16)}px Inter, "PingFang SC", system-ui, sans-serif`;
+      ctx.font = `500 ${px(16)}px "Avenir Next", "PingFang SC", system-ui, sans-serif`;
       ctx.fillText(`${BRAND_NAME} · YEAR IN REVIEW`, TITLE_X, cursorY);
       cursorY += px(44);
     } else {
       // 全量模式：品牌 72px + underline + 年份范围小字
       ctx.fillStyle = textColor;
-      ctx.font = `800 ${px(72)}px Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+      ctx.font = `800 ${px(72)}px "Avenir Next", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
       ctx.textBaseline = 'top';
       ctx.textAlign = 'left';
       const title = BRAND_NAME;
@@ -231,7 +231,7 @@ async function renderWithOverlay(
 
       if (summary.years.length) {
         ctx.fillStyle = textDimColor;
-        ctx.font = `500 ${px(14)}px "JetBrains Mono", ui-monospace, monospace`;
+        ctx.font = `500 ${px(14)}px "SFMono-Regular", "Cascadia Mono", ui-monospace, monospace`;
         const yrRange = `${summary.years[0]} — ${summary.years[summary.years.length - 1]}`;
         ctx.fillText(yrRange, TITLE_X, cursorY);
         cursorY += px(44);
@@ -257,8 +257,8 @@ async function renderWithOverlay(
           { num: summary.totalPoints.toLocaleString(), label: 'POINTS' },
         ];
 
-    const numFont = `800 ${px(48)}px Inter, "PingFang SC", system-ui, sans-serif`;
-    const labelFont = `500 ${px(16)}px "JetBrains Mono", ui-monospace, monospace`;
+    const numFont = `800 ${px(48)}px "Avenir Next", "PingFang SC", system-ui, sans-serif`;
+    const labelFont = `500 ${px(16)}px "SFMono-Regular", "Cascadia Mono", ui-monospace, monospace`;
     const labelGap = px(8); // 数字与 label 之间的间距
     const colGap = px(40); // 列与列之间的间距
 
@@ -297,14 +297,14 @@ async function renderWithOverlay(
 
     // 品牌签名（上一行）
     ctx.fillStyle = textDimColor;
-    ctx.font = `500 ${px(12)}px Inter, "PingFang SC", system-ui, sans-serif`;
+    ctx.font = `500 ${px(12)}px "Avenir Next", "PingFang SC", system-ui, sans-serif`;
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'right';
     ctx.fillText(BRAND_NAME, outW - px(48), outH - px(50));
 
     // 日期（下一行，更弱）
     ctx.globalAlpha = 0.7;
-    ctx.font = `400 ${px(11)}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.font = `400 ${px(11)}px "SFMono-Regular", "Cascadia Mono", ui-monospace, monospace`;
     ctx.fillText(dateStr, outW - px(48), outH - px(32));
     ctx.globalAlpha = 1;
   }

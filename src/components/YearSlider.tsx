@@ -17,8 +17,7 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
 
   return (
     <div
-      className="pointer-events-auto flex-1 max-w-2xl rounded-2xl border border-white/[0.08] px-3 sm:px-4 py-1.5 shadow-2xl backdrop-blur-md"
-      style={{ background: 'var(--panel)' }}
+      className="control-surface pointer-events-auto max-w-2xl flex-1 px-3 py-1.5 sm:px-4"
     >
       {/* 年份 + 数量条 */}
       <div className="mb-0.5 flex items-end justify-between gap-1">
@@ -44,7 +43,7 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
       {/* 双滑块 */}
       <div className="relative h-5">
         {/* 轨道 */}
-        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-current opacity-10" />
         {/* 已选区间 */}
         <div
           className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
@@ -122,8 +121,8 @@ export default function YearSlider({ years, perYear, start, end, onChange }: Pro
         .range-thumb::-webkit-slider-runnable-track { background: transparent; }
         .range-thumb::-moz-range-track { background: transparent; }
         .range-thumb:focus { outline: none; }
-        .range-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(255,255,255,0.2); }
-        .range-thumb:focus::-moz-range-thumb { box-shadow: 0 0 0 3px rgba(255,255,255,0.2); }
+        .range-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--focus-ring), 0 2px 6px rgba(0,0,0,0.24); }
+        .range-thumb:focus::-moz-range-thumb { box-shadow: 0 0 0 4px var(--focus-ring), 0 2px 6px rgba(0,0,0,0.24); }
         @media (max-width: 640px) {
           .range-thumb::-webkit-slider-thumb { width: 20px; height: 20px; }
           .range-thumb::-moz-range-thumb { width: 20px; height: 20px; }

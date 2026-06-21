@@ -228,6 +228,14 @@ export default function Map({ bbox, yearStart, yearEnd, pointsData, trackData }:
         preserveDrawingBuffer: true,
       });
       mapInstance = map;
+      map.on('styleimagemissing', (event: { id: string }) => {
+        if (map.hasImage(event.id)) return;
+        map.addImage(event.id, {
+          width: 1,
+          height: 1,
+          data: new Uint8Array([0, 0, 0, 0]),
+        });
+      });
 
       // macOS 触控板手势：双指移动 = pan，双指张合 = zoom
       // 浏览器规范：trackpad 张合会合成为 ctrl+wheel；自由双指移动则是普通 wheel。

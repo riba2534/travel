@@ -42,16 +42,22 @@ const TOGGLES: ToggleDef[] = [
   },
 ];
 
-export default function LayerToggles() {
+interface Props {
+  variant?: 'floating' | 'dock';
+}
+
+export default function LayerToggles({ variant = 'floating' }: Props) {
   const layers = useAppStore((s) => s.layers);
   const toggle = useAppStore((s) => s.toggleLayer);
+  const floating = variant === 'floating';
 
   return (
     <div
       role="group"
       aria-label="图层开关"
-      className="pointer-events-auto flex shrink-0 items-center gap-0.5 rounded-2xl border border-white/[0.08] p-1 shadow-2xl backdrop-blur-md"
-      style={{ background: 'var(--panel)' }}
+      className={`pointer-events-auto flex shrink-0 items-center gap-0.5 p-1 ${
+        floating ? 'control-surface' : ''
+      }`}
     >
       {TOGGLES.map((t) => {
         const active = layers[t.key];
@@ -62,8 +68,8 @@ export default function LayerToggles() {
             aria-pressed={active}
             aria-label={`${active ? '隐藏' : '显示'}${t.label}`}
             onClick={() => toggle(t.key)}
-            className={`inline-flex h-9 sm:h-8 min-w-[40px] items-center gap-1.5 rounded-xl px-2 sm:px-2.5 text-xs font-medium transition-all ${
-              active ? 'bg-accent text-bg shadow-md' : 'text-text-dim hover:text-text active:bg-white/5'
+            className={`control-button inline-flex h-9 sm:h-8 min-w-[40px] items-center justify-center gap-1.5 px-2 sm:px-2.5 text-xs font-semibold ${
+              active ? 'control-button-active shadow-sm' : ''
             }`}
             style={{ touchAction: 'manipulation' }}
           >

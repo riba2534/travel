@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useDialogFocus } from '../lib/use-dialog-focus';
 
 interface Props {
   blob: Blob | null;
@@ -18,6 +19,7 @@ function detectMobile(): boolean {
 
 export default function SharePreview({ blob, onClose, filenamePrefix = 'footprint' }: Props) {
   const [url, setUrl] = useState<string | null>(null);
+  const dialogRef = useDialogFocus<HTMLDivElement>(!!blob, onClose);
 
   useEffect(() => {
     if (!blob) {
@@ -67,9 +69,11 @@ export default function SharePreview({ blob, onClose, filenamePrefix = 'footprin
 
   return createPortal(
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="分享图预览"
+      tabIndex={-1}
       className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 bg-black/85 p-3 sm:p-5"
       onClick={onClose}
     >
@@ -77,7 +81,7 @@ export default function SharePreview({ blob, onClose, filenamePrefix = 'footprin
         type="button"
         onClick={onClose}
         aria-label="关闭预览"
-        className="absolute right-3 top-3 sm:right-5 sm:top-5 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+        className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-md bg-white/10 text-white backdrop-blur transition-colors hover:bg-white/20 sm:right-5 sm:top-5"
       >
         ✕
       </button>
@@ -89,7 +93,7 @@ export default function SharePreview({ blob, onClose, filenamePrefix = 'footprin
         <img
           src={url}
           alt="分享图"
-          className="max-h-[85vh] max-w-full rounded-lg shadow-2xl"
+          className="max-h-[85vh] max-w-full rounded-md shadow-2xl"
           style={{ objectFit: 'contain', WebkitTouchCallout: 'default' }}
           draggable
         />
@@ -114,7 +118,7 @@ export default function SharePreview({ blob, onClose, filenamePrefix = 'footprin
             <button
               type="button"
               onClick={onShare}
-              className="rounded-lg bg-white/10 px-4 py-2 text-xs font-medium text-white hover:bg-white/20 transition-colors"
+              className="rounded-md bg-white/10 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/20"
             >
               分享…
             </button>
@@ -122,14 +126,14 @@ export default function SharePreview({ blob, onClose, filenamePrefix = 'footprin
           <button
             type="button"
             onClick={onDownload}
-            className="rounded-lg bg-accent px-4 py-2 text-xs font-medium text-bg hover:brightness-110 transition-all"
+            className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-bg transition-all hover:brightness-110"
           >
             下载 PNG
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-white/10 px-4 py-2 text-xs font-medium text-white hover:bg-white/20 transition-colors"
+            className="rounded-md bg-white/10 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/20"
           >
             关闭
           </button>

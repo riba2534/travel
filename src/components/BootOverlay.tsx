@@ -6,17 +6,23 @@ interface Props {
   total: number;
   ratio: number;
   done: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
-export default function BootOverlay({ loaded, total, ratio, done }: Props) {
+export default function BootOverlay({ loaded, total, ratio, done, error, onRetry }: Props) {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
+    if (error) {
+      setHidden(false);
+      return;
+    }
     if (done) {
       const t = window.setTimeout(() => setHidden(true), 420);
       return () => window.clearTimeout(t);
     }
-  }, [done]);
+  }, [done, error]);
 
   if (hidden) return null;
 
@@ -25,15 +31,49 @@ export default function BootOverlay({ loaded, total, ratio, done }: Props) {
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center transition-opacity duration-300"
+      className={`fixed inset-0 z-[70] flex items-center justify-center transition-opacity duration-300 ${
+        error ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}
       style={{
         background: 'var(--bg)',
         opacity: done ? 0 : 1,
       }}
       aria-live="polite"
-      aria-busy={!done}
+      aria-busy={!done && !error}
     >
-      <div className="flex flex-col items-center gap-4 px-6">
+      <div className="flex w-full max-w-[320px] flex-col items-center gap-4 px-6 text-center">
+        {error ? (
+          <>
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-lg"
+              style={{ background: 'color-mix(in srgb, var(--accent) 14%, transparent)' }}
+              aria-hidden="true"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              </svg>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                数据没有加载成功
+              </div>
+              <div className="text-xs leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                请检查网络后重试。错误信息：{error}
+              </div>
+            </div>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="control-button control-button-active px-4 text-xs font-semibold"
+              >
+                重新加载
+              </button>
+            )}
+          </>
+        ) : (
+          <>
         {/* Pulsing dot + logo mark */}
         <div className="relative flex h-14 w-14 items-center justify-center">
           <span
@@ -82,6 +122,8 @@ export default function BootOverlay({ loaded, total, ratio, done }: Props) {
             }}
           />
         </div>
+          </>
+        )}
       </div>
 
       <style>{`

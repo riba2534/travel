@@ -172,10 +172,10 @@ export function renderPopupHtml(info: PopupInfo): string {
     : '';
   const eleSuffix = info.eleLabel ? ` · <span style="color:var(--text)">${escapeHtml(info.eleLabel)}</span>` : '';
   return `
-    <div style="font-family:Inter,'PingFang SC',system-ui,sans-serif;line-height:1.45;min-width:180px;max-width:260px">
+    <div style="font-family:'Avenir Next','PingFang SC',system-ui,sans-serif;line-height:1.45;min-width:180px;max-width:260px">
       <div style="color:var(--text);font-size:13px;font-weight:600;margin-bottom:4px">${escapeHtml(info.dateLabel)}</div>
       ${secondary}
-      <div style="color:var(--text-dim);font-size:11px;font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums">
+      <div style="color:var(--text-dim);font-size:11px;font-family:'SFMono-Regular','Cascadia Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums">
         ${escapeHtml(info.coordLabel)}${eleSuffix}
       </div>
       ${sameDay}

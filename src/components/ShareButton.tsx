@@ -6,10 +6,15 @@ import { useAppStore } from '../state/store';
 import { exportShare } from '../lib/share';
 import SharePreview from './SharePreview';
 
-export default function ShareButton() {
+interface Props {
+  variant?: 'floating' | 'dock';
+}
+
+export default function ShareButton({ variant = 'floating' }: Props) {
   const summary = useAppStore((s) => s.summary);
   const shareOpts = useAppStore((s) => s.shareOpts);
   const setExporting = useAppStore((s) => s.setExporting);
+  const floating = variant === 'floating';
 
   const [busy, setBusy] = useState(false);
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -43,8 +48,9 @@ export default function ShareButton() {
         disabled={busy || !summary}
         aria-label="生成分享图"
         title="生成分享图（在设置里可调显示内容）"
-        className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md text-text-dim hover:text-text active:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{ background: 'var(--panel)' }}
+        className={`control-button pointer-events-auto flex h-10 w-10 sm:h-9 sm:w-9 shrink-0 items-center justify-center ${
+          floating ? 'control-surface' : ''
+        }`}
       >
         {busy ? (
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '../state/store';
 import type { PlaceContinent, PlaceCountry, PlaceCity } from '../lib/types';
+import { useDialogFocus } from '../lib/use-dialog-focus';
 
 export default function PlacesMenu() {
   const places = useAppStore((s) => s.places);
@@ -12,6 +13,19 @@ export default function PlacesMenu() {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['AS', 'NA']));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const mobileDialogRef = useDialogFocus<HTMLDivElement>(
+    drawerOpen && isMobile,
+    () => setDrawerOpen(false),
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
   const filtered = useMemo(() => {
     if (!places) return null;
@@ -64,24 +78,28 @@ export default function PlacesMenu() {
     setDrawerOpen(false);
   };
 
-  const list = (
+  const renderList = (searchId: string) => (
     <div className="flex flex-col">
       <div
-        className="sticky top-0 z-10 flex flex-col gap-1.5 p-2 border-b border-white/[0.06] backdrop-blur-md"
-        style={{ background: 'var(--panel)' }}
+        className="sticky top-0 z-10 flex flex-col gap-2 border-b p-2"
+        style={{ background: 'var(--panel-solid)', borderColor: 'var(--ui-border)' }}
       >
+        <label htmlFor={searchId} className="sr-only">
+          搜索国家地区或城市
+        </label>
         <input
+          id={searchId}
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜索国家地区 / 城市"
-          className="w-full rounded-lg bg-white/5 px-2 py-1.5 text-xs text-text placeholder:text-text-dim focus:outline-none focus:ring-1 focus:ring-accent/50"
+          className="map-input w-full px-2.5 text-xs placeholder:text-text-dim"
         />
         {hasFilter && (
           <button
             type="button"
             onClick={clearFilter}
-            className="flex items-center justify-between w-full rounded-lg bg-accent/15 px-2 py-1 text-[11px] text-accent hover:bg-accent/25 transition-colors"
+            className="flex min-h-8 w-full items-center justify-between rounded-md bg-accent/10 px-2 text-[11px] font-medium text-accent transition-colors hover:bg-accent/20"
           >
             <span className="truncate">筛选：{filterLabel}</span>
             <span className="ml-2">✕ 清除</span>
@@ -93,11 +111,11 @@ export default function PlacesMenu() {
         {filtered.map((cont) => {
           const contOpen = expanded.has(cont.code);
           return (
-            <li key={cont.code} className="border-b border-white/[0.04] last:border-b-0">
+            <li key={cont.code} className="border-b last:border-b-0" style={{ borderColor: 'var(--ui-border)' }}>
               <button
                 type="button"
                 onClick={() => toggleExpand(cont.code)}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-white/[0.04]"
+                className="flex min-h-10 w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--ui-hover)]"
               >
                 <span className="flex items-center gap-2">
                   <Chevron open={contOpen} />
@@ -118,20 +136,20 @@ export default function PlacesMenu() {
                     return (
                       <li key={coKey}>
                         <div
-                          className={`flex items-stretch pl-5 pr-1 ${isFiltered ? 'bg-accent/[0.08]' : ''}`}
+                          className={`flex items-stretch pl-5 pr-1 ${isFiltered ? 'bg-accent/10' : ''}`}
                         >
                           <button
                             type="button"
                             onClick={() => toggleExpand(coKey)}
                             aria-label={`${coOpen ? '折叠' : '展开'}${co.name}城市`}
-                            className="flex items-center px-1 text-text-dim hover:text-text"
+                            className="flex min-w-8 items-center justify-center text-text-dim transition-colors hover:text-text"
                           >
                             <Chevron open={coOpen} small />
                           </button>
                           <button
                             type="button"
                             onClick={() => onCountry(co)}
-                            className="flex flex-1 items-center justify-between gap-2 px-1.5 py-1.5 text-left text-[11px] hover:bg-white/[0.04] rounded"
+                            className="flex min-h-9 flex-1 items-center justify-between gap-2 rounded-md px-1.5 py-1.5 text-left text-[11px] transition-colors hover:bg-[var(--ui-hover)]"
                           >
                             <span className="flex min-w-0 items-baseline gap-1.5">
                               <span className="truncate text-text">{co.name}</span>
@@ -158,8 +176,8 @@ export default function PlacesMenu() {
                                     onClick={() => onCity(city, co)}
                                     className={`flex w-full items-center justify-between gap-2 pl-12 pr-3 py-1 text-left text-[11px] transition-colors ${
                                       isCityFilter
-                                        ? 'bg-accent/[0.15] text-text'
-                                        : 'text-text-dim hover:bg-white/[0.04] hover:text-text'
+                                        ? 'bg-accent/15 text-text'
+                                        : 'text-text-dim hover:bg-[var(--ui-hover)] hover:text-text'
                                     }`}
                                   >
                                     <span className="truncate">{city.name}</span>
@@ -181,6 +199,11 @@ export default function PlacesMenu() {
           );
         })}
       </ul>
+      {filtered.length === 0 && (
+        <div className="px-4 py-8 text-center text-xs leading-relaxed text-text-dim">
+          没有匹配的地点
+        </div>
+      )}
     </div>
   );
 
@@ -193,8 +216,7 @@ export default function PlacesMenu() {
           onClick={() => setDrawerOpen((o) => !o)}
           aria-expanded={drawerOpen}
           aria-label={drawerOpen ? '关闭地点菜单' : '打开地点菜单'}
-          className="relative inline-flex h-10 sm:h-9 min-w-[44px] items-center gap-1.5 rounded-2xl border border-white/[0.08] px-3 text-xs font-medium shadow-2xl backdrop-blur-md active:bg-white/5 hover:bg-white/5 transition-colors"
-          style={{ background: 'var(--panel)' }}
+          className="control-surface control-button relative inline-flex h-10 min-w-[44px] items-center gap-1.5 px-3 text-xs font-semibold sm:h-9"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-7-7-12a7 7 0 1 1 14 0c0 5-7 12-7 12z" />
@@ -205,23 +227,25 @@ export default function PlacesMenu() {
         </button>
 
         {/* 桌面端下拉面板：drawerOpen 时显示在按钮下方 */}
-        {drawerOpen && (
+        {drawerOpen && !isMobile && (
           <div
-            className="hidden sm:block w-[280px] max-h-[72dvh] overflow-y-auto rounded-2xl border border-white/[0.08] shadow-2xl backdrop-blur-md"
-            style={{ background: 'var(--panel)' }}
+            className="control-surface-strong hidden max-h-[72dvh] w-[300px] overflow-y-auto sm:block"
           >
-            {list}
+            {renderList('places-search-desktop')}
           </div>
         )}
       </div>
 
       {/* 移动端底部 sheet：高于 VisibilityToggle(z-55)，低于 WrappedStory(z-65) / BootOverlay(z-70) */}
-      {drawerOpen && (
+      {drawerOpen && isMobile && (
         <div
+          ref={mobileDialogRef}
           className="sm:hidden pointer-events-auto fixed inset-0 z-[60]"
           role="dialog"
           aria-modal="true"
           aria-label="地点菜单"
+          tabIndex={-1}
+          style={{ zIndex: 80 }}
           onClick={(e) => {
             if (e.target === e.currentTarget) setDrawerOpen(false);
           }}
@@ -233,29 +257,30 @@ export default function PlacesMenu() {
           />
           {/* sheet body：从底部滑起 */}
           <div
-            className="absolute inset-x-0 bottom-0 flex max-h-[82dvh] flex-col rounded-t-2xl border-t border-white/[0.08] shadow-2xl overflow-hidden animate-[sheet-up_260ms_cubic-bezier(0.2,0.8,0.2,1)_forwards]"
+            className="absolute inset-x-0 bottom-0 flex h-[82dvh] max-h-[82dvh] flex-col rounded-t-2xl border-t border-white/[0.08] shadow-2xl overflow-hidden animate-[sheet-up_260ms_cubic-bezier(0.2,0.8,0.2,1)_forwards]"
             style={{
-              background: 'var(--panel)',
+              background: 'var(--bg)',
+              borderColor: 'var(--ui-border)',
               paddingBottom: 'env(safe-area-inset-bottom)',
             }}
           >
             {/* handle */}
             <div className="flex items-center justify-center pt-2 pb-1">
-              <div className="h-1 w-10 rounded-full bg-white/25" aria-hidden="true" />
+              <div className="h-1 w-10 rounded-full bg-current opacity-20" aria-hidden="true" />
             </div>
             {/* header with close */}
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2">
+            <div className="flex items-center justify-between border-b px-4 py-2" style={{ borderColor: 'var(--ui-border)' }}>
               <span className="text-xs font-medium text-text">国家和地区 · 城市</span>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
                 aria-label="关闭"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-text-dim hover:text-text hover:bg-white/5"
+                className="control-button flex h-8 w-8 items-center justify-center"
               >
                 ✕
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto overscroll-contain">{list}</div>
+            <div className="flex-1 overflow-y-auto overscroll-contain">{renderList('places-search-mobile')}</div>
           </div>
 
           <style>{`
