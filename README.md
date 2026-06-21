@@ -155,8 +155,8 @@ VITE_TRAVEL_DATA_MANIFEST_URL=http://localhost:8080/manifest.json npm run dev
 
 ```bash
 npm run build:data -- \
-  --gpx /Users/hepengcheng/Downloads/backUpData-all.gpx \
-  --csv /Users/hepengcheng/Downloads/backUpPhotoData.csv \
+  --gpx /path/to/backUpData-all.gpx \
+  --csv /path/to/backUpPhotoData.csv \
   --out dist-data/current
 ```
 
