@@ -13,13 +13,7 @@ import type { Places, Summary, PointFC, TrackFC } from './lib/types';
 import { useAppStore } from './state/store';
 import { streamFetchJson, aggregateProgress } from './lib/fetch-progress';
 import { decodeState, encodeState, writeHash } from './lib/url-state';
-
-const DATA_URLS = {
-  summary: '/data/summary.json',
-  places: '/data/places.json',
-  points: '/data/points.geojson',
-  track: '/data/track.geojson',
-};
+import { dataManifestUrl, resolveDataUrls, type DataManifest } from './lib/data-manifest';
 
 export default function App() {
   const summary = useAppStore((s) => s.summary);
@@ -41,24 +35,39 @@ export default function App() {
   const hashAppliedRef = useRef(false);
 
   useEffect(() => {
-    const urls = [DATA_URLS.summary, DATA_URLS.places, DATA_URLS.points, DATA_URLS.track];
-    const onProg = aggregateProgress(urls, setProgress);
+    let cancelled = false;
 
-    Promise.all([
-      streamFetchJson<Summary>(DATA_URLS.summary, onProg),
-      streamFetchJson<Places>(DATA_URLS.places, onProg),
-      streamFetchJson<PointFC>(DATA_URLS.points, onProg),
-      streamFetchJson<TrackFC>(DATA_URLS.track, onProg),
-    ])
-      .then(([s, p, pts, tr]) => {
+    async function loadData() {
+      const manifestUrl = dataManifestUrl();
+      const manifest = await streamFetchJson<DataManifest>(manifestUrl);
+      const dataUrls = resolveDataUrls(manifest, manifestUrl);
+      const urls = [dataUrls.summary, dataUrls.places, dataUrls.points, dataUrls.track];
+      const onProg = aggregateProgress(urls, setProgress);
+
+      const [s, p, pts, tr] = await Promise.all([
+        streamFetchJson<Summary>(dataUrls.summary, onProg),
+        streamFetchJson<Places>(dataUrls.places, onProg),
+        streamFetchJson<PointFC>(dataUrls.points, onProg),
+        streamFetchJson<TrackFC>(dataUrls.track, onProg),
+      ]);
+
+      if (!cancelled) {
         setSummary(s);
         setPlaces(p);
         setGeoData({ points: pts, track: tr });
-      })
+      }
+    }
+
+    loadData()
       .catch((e) => {
+        if (cancelled) return;
         console.error('加载数据失败', e);
         setProgress({ loaded: 0, total: 0, ratio: 0, done: true });
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [setSummary, setPlaces]);
 
   // ESC 键复原 UI

@@ -1,6 +1,6 @@
 // 反向地理编码工具：把 places.json 里仍以经纬度显示的 "cities" 反查成中文地名，
 // 输出 scripts/known-cities-auto.ts。用法：
-//   1) 先跑 `npm run build:data` 生成 public/data/places.json
+//   1) 先跑 `npm run build:data` 生成 dist-data/current/places.json
 //   2) 跑 `npx tsx scripts/fetch-city-names.ts`
 //   3) 再跑 `npm run build:data` 让新地名生效
 // Nominatim 公共服务限流 1 req/s，本脚本严格串行 + 1.2s 间隔。
@@ -13,12 +13,23 @@ interface PlaceContinent { countries: PlaceCountry[] }
 interface Places { continents: PlaceContinent[] }
 
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
-const PLACES = path.join(ROOT, 'public/data/places.json');
+function argValue(name: string): string | undefined {
+  const flag = `--${name}`;
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === flag) return argv[i + 1];
+    if (argv[i].startsWith(`${flag}=`)) return argv[i].slice(flag.length + 1);
+  }
+  return undefined;
+}
+
+const placesArg = argValue('places') ?? 'dist-data/current/places.json';
+const PLACES = path.isAbsolute(placesArg) ? placesArg : path.join(ROOT, placesArg);
 const OUT = path.join(ROOT, 'scripts/known-cities-auto.ts');
 const CACHE = path.join(ROOT, 'scripts/city-cache.json');
 
 if (!fs.existsSync(PLACES)) {
-  console.error('✗ places.json not found. Run `npm run build:data` first.');
+  console.error('✗ places.json not found. Run `npm run build:data` first, or pass --places <path>.');
   process.exit(1);
 }
 

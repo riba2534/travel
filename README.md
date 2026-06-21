@@ -35,8 +35,62 @@
 | 距离计算 | @turf/length |
 | 样式 | Tailwind CSS 3 + 5 个 CSS variable |
 | 字体 | Inter（UI）+ JetBrains Mono（数字） |
-| 部署 | Cloudflare Pages（自动 HTTPS + 全球 CDN） |
-| CI/CD | GitHub Actions（push main 自动部署） |
+| 网站部署 | Cloudflare Pages（自动 HTTPS + 全球 CDN） |
+| 数据托管 | Cloudflare R2 自定义域名 `data.travel.riba2534.cn` |
+| CI/CD | GitHub Actions（push main 自动部署网站；数据单独发布） |
+
+---
+
+## 架构
+
+网站代码和旅行数据是两条独立发布链路。代码发布只更新 Cloudflare Pages 上的 React/Vite 静态站；数据发布只更新 Cloudflare R2 上的版本化 snapshot 和 `manifest.json`。生产环境通过 Worker 路由把 `travel.riba2534.cn/data/*` 反代到 R2，浏览器只访问同源 URL；本地开发默认直接读取 `data.travel.riba2534.cn`。
+
+```mermaid
+flowchart LR
+  subgraph Code["网站代码发布"]
+    Repo["GitHub repo\nReact / Vite / TypeScript"]
+    Action["GitHub Actions\nnpm ci -> npm run build"]
+    Pages["Cloudflare Pages\ntravel-map"]
+    Site["travel.riba2534.cn"]
+    Repo --> Action --> Pages --> Site
+  end
+
+  subgraph Data["旅行数据发布"]
+    Raw["本地原始数据\nGPX / photos CSV"]
+    BuildData["scripts/build-data.ts\n生成 GeoJSON / JSON"]
+    LocalData["dist-data/current\n本地生成产物"]
+    PublishData["scripts/publish-data.ts\n上传 snapshot 后更新 manifest"]
+    R2["Cloudflare R2\nbucket: travel-data"]
+    DataDomain["data.travel.riba2534.cn"]
+    Worker["Cloudflare Worker Route\ntravel.riba2534.cn/data/*"]
+    Raw --> BuildData --> LocalData --> PublishData --> R2 --> DataDomain
+    R2 --> Worker
+  end
+
+  subgraph Runtime["浏览器运行时"]
+    Browser["用户浏览器"]
+    App["React App\nApp.tsx"]
+    Manifest["/data/manifest.json\n短缓存"]
+    Snapshot["/data/snapshots/<version>/*\n长缓存 immutable"]
+    Map["MapLibre 地图渲染"]
+    Browser --> Site --> App
+    App --> Manifest
+    Manifest --> Snapshot
+    Snapshot --> App --> Map
+  end
+
+  Worker --> Manifest
+  Worker --> Snapshot
+```
+
+数据文件发布时遵循原子更新顺序：先上传 `snapshots/<version>/` 下的四个文件，全部成功后最后覆盖 `manifest.json`。因此线上用户要么读到旧版本，要么读到新版本，不会读到半套数据。
+
+缓存策略：
+
+| 路径 | 缓存策略 | 原因 |
+|---|---|---|
+| `manifest.json` | `public, max-age=60, must-revalidate` | 快速切换当前数据版本 |
+| `snapshots/<version>/*` | `public, max-age=31536000, immutable` | 文件路径带版本，内容不可变，可长期缓存 |
 
 ---
 
@@ -44,29 +98,30 @@
 
 ```
 travel/
-├── raw/track.gpx              # 原始 GPX（gitignored，本地保留）
-├── public/data/               # 构建产物（入库 → CI 复用）
-│   ├── points.geojson         # 全部足迹点
-│   ├── track.geojson          # MultiLineString 轨迹（简化后）
-│   └── summary.json           # 统计 + 国家 + 高频城市
+├── raw/                       # 原始 GPX/CSV（gitignored，本地保留）
+├── dist-data/current/         # 本地生成数据（gitignored，仅用于发布前检查）
 ├── scripts/
-│   ├── build-data.ts          # GPX → 三件套构建脚本
+│   ├── build-data.ts          # GPX/CSV → points/track/summary/places
+│   ├── publish-data.ts        # 上传数据 snapshot + manifest 到 R2
 │   └── known-cities.ts        # 已知城市目录（用于命名网格中心）
+├── workers/
+│   └── travel-data-worker.js  # /data/* → R2 的同源 Worker
 ├── src/
 │   ├── main.tsx
-│   ├── App.tsx                # 全局状态 + 布局
+│   ├── App.tsx                # manifest 数据加载 + 全局布局
 │   ├── Map.tsx                # MapLibre 实例、所有图层、交互
 │   ├── components/
 │   │   ├── Header.tsx         # 左上：标题 + 统计（合并）
-│   │   ├── CityList.tsx       # 右上：高频城市
+│   │   ├── PlacesMenu.tsx     # 右上：国家/城市筛选
 │   │   ├── YearSlider.tsx     # 底部：年份双滑块 + 直方图
-│   │   └── ModeToggle.tsx     # 底左：点位 / 热力切换
+│   │   └── LayerToggles.tsx   # 底左：点位 / 热力 / 轨迹开关
 │   ├── lib/
 │   │   ├── types.ts
+│   │   ├── data-manifest.ts   # R2 manifest 解析
 │   │   └── mapStyle.ts        # 拉 OpenFreeMap 风格 + 强制中文化
 │   └── styles/globals.css
 ├── .github/workflows/deploy.yml  # GitHub Actions
-├── index.html                 # preconnect + preload summary.json
+├── index.html                 # preconnect 数据域名 + 地图/字体域名
 ├── tailwind.config.js
 └── vite.config.ts             # brotli + gzip 压缩 + maplibre 单独 chunk
 ```
@@ -79,51 +134,86 @@ travel/
 # 1. 安装依赖
 npm install
 
-# 2. 把你的 GPX 放到 raw/track.gpx
-mkdir -p raw && cp /path/to/your.gpx raw/track.gpx
-
-# 3. 构建数据三件套（输出到 public/data/）
-npm run build:data
-
-# 4. 启动 dev server
+# 2. 启动 dev server
+# 生产读取 /data/manifest.json；本地默认读取 https://data.travel.riba2534.cn/manifest.json
 npm run dev          # http://localhost:5173
 
-# 5. 生产构建 + 本地预览
-npm run build        # 只跑 vite build，要求 public/data/ 已存在
-npm run build:full   # = build:data + build，从 GPX 一把梭
+# 3. 生产构建 + 本地预览
+npm run build
 npm run preview      # http://localhost:4173
 ```
 
-### 用你自己的 GPX
+如需在本地临时测试另一套数据源：
 
-把任意 GPX 放到 `raw/track.gpx`（任意 GPS 类 App 导出的标准 GPX 都可以），然后跑 `npm run build:data`。脚本会：
+```bash
+VITE_TRAVEL_DATA_MANIFEST_URL=http://localhost:8080/manifest.json npm run dev
+```
+
+### 更新旅行数据
+
+原始数据不入库。把任意 GPX/CSV 放在本地后，用参数指定输入和输出：
+
+```bash
+npm run build:data -- \
+  --gpx /Users/hepengcheng/Downloads/backUpData-all.gpx \
+  --csv /Users/hepengcheng/Downloads/backUpPhotoData.csv \
+  --out dist-data/current
+```
+
+脚本会：
 
 1. 流式解析所有 `<trkpt>`（用正则，比 xmldom 快 10x）
-2. 经纬度保留 5 位小数（约 1m 精度，节省 40% 体积）
-3. 按相邻点时间间隔 > 30 分钟切段（避免跨洋直线）
-4. 每段 simplify-js 简化（tolerance 0.0001）
-5. 采样比对 50m 国家边界生成国家列表
-6. 0.5°×0.5° 网格聚合，匹配 `scripts/known-cities.ts` 中的已知城市生成 topCities
+2. 解析照片定位 CSV（`dataTime,locType,longitude,latitude,...`）
+3. 经纬度保留 5 位小数（约 1m 精度，节省体积）
+4. 按相邻点时间间隔 > 30 分钟切段（避免跨洋直线）
+5. 每段 simplify-js 简化（tolerance 0.0001）
+6. 采样比对 10m 国家边界生成国家列表
+7. 0.5°×0.5° 网格聚合，匹配 `scripts/known-cities.ts` / `scripts/known-cities-auto.ts` 生成城市
 
 如果你常去的地点不在 `known-cities.ts` 里，自己加几行进去（按经纬度匹配，半径 0.8°）。
 
+生成后发布到 R2：
+
+```bash
+export CF_ACCOUNT_ID=...
+export R2_ACCESS_KEY_ID=...
+export R2_SECRET_ACCESS_KEY=...
+
+npm run publish:data -- --dir dist-data/current --bucket travel-data --version 2026-06-22
+```
+
+发布脚本会先上传：
+
+```text
+snapshots/2026-06-22/summary.json
+snapshots/2026-06-22/places.json
+snapshots/2026-06-22/points.geojson
+snapshots/2026-06-22/track.geojson
+```
+
+最后再覆盖 `manifest.json`。前端只读取 manifest 指向的版本，避免用户读到半套旧数据、半套新数据。
+
 ---
 
-## CI/CD：push main 自动部署
+## CI/CD：push main 自动部署网站
 
-`.github/workflows/deploy.yml` 监听 main 分支 push，自动跑 `npm run build` 并通过 wrangler-action 部署到 Cloudflare Pages。
+`.github/workflows/deploy.yml` 监听 main 分支 push，自动跑 `npm run build` 并通过 wrangler-action 部署到 Cloudflare Pages。网站构建不再依赖 `public/data/`，数据由 R2 独立托管。
 
 ### 工作流程
 
 ```
-本地添加新 GPX → npm run build:full → git commit public/data/ + push
-                                              ↓
-                       GitHub Actions：npm ci → npm run build → wrangler pages deploy
-                                              ↓
-                                        Cloudflare Pages 全球 CDN
+代码变更 → git push main
+                  ↓
+ GitHub Actions：npm ci → npm run build → wrangler pages deploy
+                  ↓
+          Cloudflare Pages：travel.riba2534.cn
+
+数据变更 → npm run build:data → npm run publish:data
+                  ↓
+          Cloudflare R2：data.travel.riba2534.cn
 ```
 
-**关键点**：原始 GPX 不入库（`raw/` 在 .gitignore），但**构建产物 `public/data/` 入库**——CI 拿到代码就能直接 `vite build`，不需要 GPX 文件。新增行程后本地重跑 `npm run build:full` 重生数据，commit 后 push 即可。
+**关键点**：原始 GPX/CSV 不入库，`dist-data/` 也不入库。更新数据时只发布 R2 manifest，不需要提交大体积 GeoJSON，也不需要重新部署网站。
 
 ### 准备工作（一次性）
 
@@ -135,6 +225,11 @@ npm run preview      # http://localhost:4173
 3. **在 GitHub 仓库 Settings → Secrets and variables → Actions 添加两个 Secret**：
    - `CLOUDFLARE_API_TOKEN`：去 <https://dash.cloudflare.com/profile/api-tokens> 用 "Cloudflare Pages — Edit" 模板创建
    - `CLOUDFLARE_ACCOUNT_ID`：去 Cloudflare Dashboard 任一域名右下角复制
+4. **创建 R2 数据 bucket + 自定义域名**：
+   - Bucket：`travel-data`
+   - 自定义域名：`data.travel.riba2534.cn`
+   - CORS：允许 `https://travel.riba2534.cn`、Pages 子域名、`localhost`/`127.0.0.1` 本地开发端口 GET/HEAD
+   - Worker Route：`travel.riba2534.cn/data/*` 绑定 R2 bucket `travel-data`，脚本见 `workers/travel-data-worker.js`
 
 完成后 push main 就会自动部署。也可以在 Actions 页面手动 `workflow_dispatch` 触发。
 
@@ -156,12 +251,14 @@ npm run preview      # http://localhost:4173
 | `index.js` | 50 KB | 立即 |
 | `maplibre.js` | 211 KB | 立即（manualChunks 分离） |
 | `index.css` | 12 KB | 立即 |
-| `summary.json` | 0.6 KB | `<link rel="preload">` |
+| `/data/manifest.json` | <1 KB | 先加载，短缓存 |
+| `summary.json` | <50 KB | manifest 指向，长缓存 |
+| `places.json` | <50 KB | manifest 指向，长缓存 |
 | OpenFreeMap style | ~100 KB | 异步，map 初始化时 |
-| `track.geojson` | 视数据量 | map.on('load') 后异步 |
-| `points.geojson` | 视数据量 | map.on('load') 后异步 |
+| `track.geojson` | 视数据量 | R2 snapshot，长缓存 |
+| `points.geojson` | 视数据量 | R2 snapshot，长缓存 |
 
-首次进入 LCP < 2s。冷 CDN 时大体积 points.geojson 首次下载较慢（边缘缓存后秒开）。
+`points.geojson` 原始体积较大，但 Cloudflare 会在边缘压缩和缓存；snapshot 文件带长期缓存，只有 `manifest.json` 需要短缓存。
 
 ---
 
@@ -170,7 +267,7 @@ npm run preview      # http://localhost:4173
 - **国家识别用 50m 边界**：海岸城市/小岛可能误判（接受 MVP 误差，要更精确可换 10m 数据集）
 - **少量乡镇 OSM 缺 `name:zh`**：会回退显示英文/拼音
 - **Track 不参与年份过滤**：轨迹线没有逐顶点时间戳，只切了段
-- **首次访问 points.geojson 慢**：未压缩；Cloudflare 边缘缓存后会自动 brotli 压缩
+- **首次访问 points.geojson 慢**：冷边缘节点首次下载仍然较慢；R2 snapshot 长缓存后会显著改善
 
 ---
 

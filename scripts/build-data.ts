@@ -1,5 +1,5 @@
-// GPX → points.geojson + track.geojson + summary.json
-// 一次性构建脚本，用 tsx 跑：npm run build:data
+// GPX/CSV → points.geojson + track.geojson + summary.json + places.json
+// 用 tsx 跑：npm run build:data -- --gpx raw/track.gpx --csv raw/photos.csv --out dist-data/current
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,9 +28,25 @@ const countries110 = require('world-atlas/countries-10m.json');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const RAW_GPX = path.join(ROOT, 'raw/track.gpx');
-const RAW_CSV = path.join(ROOT, 'raw/photos.csv');
-const OUT = path.join(ROOT, 'public/data');
+
+function argValue(name: string): string | undefined {
+  const flag = `--${name}`;
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === flag) return argv[i + 1];
+    if (argv[i].startsWith(`${flag}=`)) return argv[i].slice(flag.length + 1);
+  }
+  return undefined;
+}
+
+function resolveInputPath(value: string | undefined, fallback: string): string {
+  const p = value ?? fallback;
+  return path.isAbsolute(p) ? p : path.join(ROOT, p);
+}
+
+const RAW_GPX = resolveInputPath(argValue('gpx') ?? process.env.TRAVEL_GPX, 'raw/track.gpx');
+const RAW_CSV = resolveInputPath(argValue('csv') ?? process.env.TRAVEL_PHOTOS_CSV, 'raw/photos.csv');
+const OUT = resolveInputPath(argValue('out') ?? process.env.TRAVEL_DATA_OUT, 'dist-data/current');
 
 type Pt = { lat: number; lon: number; t: number; ele: number };
 const pts: Pt[] = [];

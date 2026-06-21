@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build:data": "tsx scripts/build-data.ts",
+    "publish:data": "tsx scripts/publish-data.ts",
     "geocode": "tsx scripts/fetch-city-names.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",

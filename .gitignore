@@ -21,7 +21,7 @@ vite.config.js
 .vscode
 .idea
 
-# 注：public/data/ 故意不在此处忽略
-# 数据三件套（points/track/summary）随仓库提交，用于 CI 构建
-# 本地添加新 GPX 后，跑 npm run build:data 重生 + commit
+# 生成后的旅行数据由 R2 托管，不再提交进网站仓库
+public/data/
+dist-data/
 .claude/
