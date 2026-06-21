@@ -203,7 +203,7 @@ export default function App() {
             <LayerToggles variant="dock" />
             <FitAllButton variant="dock" />
             <div className="mx-1 h-6 w-px bg-current opacity-10" aria-hidden="true" />
-            <ShareButton variant="dock" />
+            <ShareButton variant="dock" pointsData={geoData?.points ?? null} />
             <SettingsButton variant="dock" />
           </div>
         </div>
@@ -229,7 +229,7 @@ export default function App() {
             onChange={(s, e) => setYearRange(s, e)}
           />
           <div className="hidden sm:flex items-end gap-2">
-            <ShareButton />
+            <ShareButton pointsData={geoData?.points ?? null} />
             <SettingsButton />
           </div>
         </div>

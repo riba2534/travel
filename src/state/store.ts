@@ -32,7 +32,19 @@ export interface ShareOptions {
   showPoints: boolean;
   showTrack: boolean;
   showHeatmap: boolean;
+  // 旅行片段导出：启用后只导出日期范围内的点，并临时生成该段轨迹线
+  dateRangeEnabled: boolean;
+  dateStart: string;
+  dateEnd: string;
 }
+
+export type ShareToggleKey = {
+  [K in keyof ShareOptions]: ShareOptions[K] extends boolean ? K : never;
+}[keyof ShareOptions];
+
+export type ShareDateRangePatch = Partial<
+  Pick<ShareOptions, 'dateRangeEnabled' | 'dateStart' | 'dateEnd'>
+>;
 
 interface AppState {
   summary: Summary | null;
@@ -58,7 +70,8 @@ interface AppState {
   setUiHidden: (v: boolean) => void;
   setExporting: (v: boolean) => void;
   flyTo: (t: Omit<FlyTarget, 'nonce'>) => void;
-  setShareOpt: (key: keyof ShareOptions, v: boolean) => void;
+  setShareOpt: (key: ShareToggleKey, v: boolean) => void;
+  setShareDateRange: (patch: ShareDateRangePatch) => void;
 }
 
 const DEFAULT_SHARE_OPTS: ShareOptions = {
@@ -70,6 +83,9 @@ const DEFAULT_SHARE_OPTS: ShareOptions = {
   showPoints: true,
   showTrack: false,
   showHeatmap: false,
+  dateRangeEnabled: false,
+  dateStart: '',
+  dateEnd: '',
 };
 
 export const useAppStore = create<AppState>()(
@@ -105,7 +121,11 @@ export const useAppStore = create<AppState>()(
       setExporting: (v) => set({ exporting: v }),
       flyTo: (t) => set({ flyTarget: { ...t, nonce: Date.now() } }),
       setShareOpt: (key, v) =>
-        set((st) => ({ shareOpts: { ...st.shareOpts, [key]: v } })),
+        set((st) => ({ shareOpts: { ...DEFAULT_SHARE_OPTS, ...st.shareOpts, [key]: v } })),
+      setShareDateRange: (patch) =>
+        set((st) => ({
+          shareOpts: { ...DEFAULT_SHARE_OPTS, ...st.shareOpts, ...patch },
+        })),
     }),
     {
       name: 'travel-app-v1',
@@ -115,6 +135,15 @@ export const useAppStore = create<AppState>()(
         layers: s.layers,
         shareOpts: s.shareOpts,
       }) as Partial<AppState>,
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<AppState> | undefined;
+        return {
+          ...current,
+          ...saved,
+          layers: { ...current.layers, ...(saved?.layers ?? {}) },
+          shareOpts: { ...DEFAULT_SHARE_OPTS, ...(saved?.shareOpts ?? {}) },
+        };
+      },
       version: 1,
     },
   ),

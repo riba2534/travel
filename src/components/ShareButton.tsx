@@ -4,20 +4,25 @@
 import { useState } from 'react';
 import { useAppStore } from '../state/store';
 import { exportShare } from '../lib/share';
+import { buildShareDateRangeExport } from '../lib/share-date-range';
+import type { PointFC } from '../lib/types';
 import SharePreview from './SharePreview';
 
 interface Props {
   variant?: 'floating' | 'dock';
+  pointsData: PointFC | null;
 }
 
-export default function ShareButton({ variant = 'floating' }: Props) {
+export default function ShareButton({ variant = 'floating', pointsData }: Props) {
   const summary = useAppStore((s) => s.summary);
+  const places = useAppStore((s) => s.places);
   const shareOpts = useAppStore((s) => s.shareOpts);
   const setExporting = useAppStore((s) => s.setExporting);
   const floating = variant === 'floating';
 
   const [busy, setBusy] = useState(false);
   const [blob, setBlob] = useState<Blob | null>(null);
+  const [filenamePrefix, setFilenamePrefix] = useState('footprint');
   const [err, setErr] = useState<string | null>(null);
 
   const onClick = async () => {
@@ -30,7 +35,35 @@ export default function ShareButton({ variant = 'floating' }: Props) {
     setErr(null);
     setExporting(true);
     try {
-      const b = await exportShare(map, summary, shareOpts);
+      let exportCtx: Parameters<typeof exportShare>[3];
+      let nextFilenamePrefix = 'footprint';
+
+      if (shareOpts.dateRangeEnabled) {
+        if (!pointsData) {
+          throw new Error('足迹数据还没有加载完成');
+        }
+        const range = buildShareDateRangeExport(
+          pointsData,
+          shareOpts.dateStart,
+          shareOpts.dateEnd,
+          places,
+        );
+        exportCtx = {
+          bbox: range.bbox,
+          sourceData: { points: range.points, track: range.track },
+          subtitle: range.label,
+          stats: range.stats,
+          outputSize: range.outputSize,
+          fitPadding: range.fitPadding,
+          maxZoom: range.maxZoom,
+          enhancePlaceLabels: true,
+          placeLabels: range.placeLabels,
+        };
+        nextFilenamePrefix = range.filenamePrefix;
+      }
+
+      const b = await exportShare(map, summary, shareOpts, exportCtx);
+      setFilenamePrefix(nextFilenamePrefix);
       setBlob(b);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -72,7 +105,11 @@ export default function ShareButton({ variant = 'floating' }: Props) {
         )}
       </button>
 
-      <SharePreview blob={blob} onClose={() => setBlob(null)} />
+      <SharePreview
+        blob={blob}
+        onClose={() => setBlob(null)}
+        filenamePrefix={filenamePrefix}
+      />
 
       {err && (
         <div

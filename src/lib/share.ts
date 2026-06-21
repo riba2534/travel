@@ -1,9 +1,10 @@
-import type { Map as MLMap } from 'maplibre-gl';
-import type { Summary } from './types';
+import type { GeoJSONSource, Map as MLMap } from 'maplibre-gl';
+import type { PointFC, Summary, TrackFC } from './types';
 import type { ShareOptions } from '../state/store';
+import type { SharePlaceLabel, ShareRangeStats } from './share-date-range';
 
-const OUT_W = 1920;
-const OUT_H = 1080;
+const DEFAULT_OUT_W = 1920;
+const DEFAULT_OUT_H = 1080;
 const BRAND_NAME = 'HPCのJourneys';
 
 // 主图默认 layer id。年度图 layer id 前缀不同，调用方需显式传 layerIds: {}（或自己的 id）
@@ -21,11 +22,42 @@ export interface LayerIds {
   heatmap?: string;
 }
 
+export interface ExportSize {
+  width: number;
+  height: number;
+}
+
+export interface ExportPadding {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 export interface ExportContext {
   /** 指定年份：标题从品牌翻转为 {year} Hero、stats 用 summary.yearStats 对应项 */
   year?: number;
   /** 覆盖 fitBounds 的 bbox（默认用 summary.bbox） */
   bbox?: [number, number, number, number];
+  /** 覆盖地图 source 数据。导出后会还原为导出前的数据 */
+  sourceData?: {
+    points?: PointFC;
+    track?: TrackFC;
+  };
+  /** 全量模式下替代年份范围的小字，例如旅行日期范围 */
+  subtitle?: string;
+  /** 覆盖左上角统计项，例如一次旅行的 km / days / points */
+  stats?: ShareRangeStats[];
+  /** 覆盖导出 fitBounds 最大 zoom，日期范围出图需要更细节 */
+  maxZoom?: number;
+  /** 覆盖导出画布尺寸。日期范围可用竖版或方图减少空白 */
+  outputSize?: ExportSize;
+  /** 覆盖 fitBounds padding。日期范围用更紧的 padding */
+  fitPadding?: ExportPadding;
+  /** 分享导出时临时提高底图地名密度，导出后还原 */
+  enhancePlaceLabels?: boolean;
+  /** 日期范围导出专用：这次旅行经过的城市名，直接绘制到图片上 */
+  placeLabels?: SharePlaceLabel[];
   /**
    * 覆盖默认主图 layer id。未传 → 用主图默认（points-glow/points-core/track-line/heatmap）；
    * 传 {} → 跳过所有 layer 切换（如年度图自管 layer）；
@@ -55,9 +87,13 @@ export async function exportShare(
     bearing: map.getBearing(),
     pitch: map.getPitch(),
   };
+  const outSize = exportCtx?.outputSize ?? { width: DEFAULT_OUT_W, height: DEFAULT_OUT_H };
+  const fitPadding = exportCtx?.fitPadding ?? { top: 260, bottom: 140, left: 80, right: 80 };
 
   // layer id 解析：exportCtx.layerIds 未传用主图默认；传 {} 则全部 undefined，跳过所有切换
   const ids: LayerIds = exportCtx?.layerIds ?? DEFAULT_LAYER_IDS;
+  const sourceOverrides = collectSourceOverrides(map, exportCtx);
+  const labelBoosts = collectPlaceLabelBoosts(map, exportCtx?.enhancePlaceLabels ?? false);
 
   // 1. 按 opts 临时覆盖主图图层可见性（仅对导出生效，finally 还原）
   type LayerVisOverride = { layerId: string; want: boolean };
@@ -92,15 +128,20 @@ export async function exportShare(
     prevPaint.set(`${layerId}:${prop}`, map.getPaintProperty(layerId, prop));
     map.setPaintProperty(layerId, prop, target);
   }
+  applyPlaceLabelBoosts(map, labelBoosts);
 
   try {
+    for (const override of sourceOverrides) {
+      override.source.setData(override.next);
+    }
+
     // 临时 off-screen 1920×1080
     Object.assign(container.style, {
       position: 'fixed',
       left: '-20000px',
       top: '0px',
-      width: `${OUT_W}px`,
-      height: `${OUT_H}px`,
+      width: `${outSize.width}px`,
+      height: `${outSize.height}px`,
       zIndex: '-1',
     } satisfies Partial<CSSStyleDeclaration>);
     map.resize();
@@ -110,9 +151,9 @@ export async function exportShare(
     map.fitBounds(
       [[targetBbox[0], targetBbox[1]], [targetBbox[2], targetBbox[3]]],
       {
-        padding: { top: 260, bottom: 140, left: 80, right: 80 },
+        padding: fitPadding,
         animate: false,
-        maxZoom: 6,
+        maxZoom: exportCtx?.maxZoom ?? 6,
       },
     );
 
@@ -126,7 +167,7 @@ export async function exportShare(
     });
     await new Promise<void>((r) => requestAnimationFrame(() => r()));
 
-    const blob = await renderWithOverlay(map, summary, opts, exportCtx);
+    const blob = await renderWithOverlay(map, summary, opts, exportCtx, outSize);
     return blob;
   } finally {
     // 还原 container + camera
@@ -149,7 +190,173 @@ export async function exportShare(
         map.setLayoutProperty(layerId, 'visibility', vis);
       }
     }
+    // 还原 source data
+    for (const override of sourceOverrides) {
+      if (map.getSource(override.id)) {
+        override.source.setData(override.prev);
+      }
+    }
+    restorePlaceLabelBoosts(map, labelBoosts);
   }
+}
+
+interface PlaceLabelBoost {
+  layerId: string;
+  minzoom: number;
+  maxzoom: number;
+  textPadding: unknown;
+  textAllowOverlap: unknown;
+  targetMinzoom: number;
+}
+
+const PLACE_LABEL_TARGETS: Array<{ layerId: string; minzoom: number }> = [
+  { layerId: 'label_city', minzoom: 3 },
+  { layerId: 'label_city_capital', minzoom: 3 },
+  { layerId: 'label_state', minzoom: 4.2 },
+  { layerId: 'label_town', minzoom: 4.4 },
+  { layerId: 'label_village', minzoom: 5.1 },
+  { layerId: 'label_other', minzoom: 5.1 },
+];
+
+function collectPlaceLabelBoosts(map: MLMap, enabled: boolean): PlaceLabelBoost[] {
+  if (!enabled) return [];
+  const layers = map.getStyle().layers ?? [];
+  const boosts: PlaceLabelBoost[] = [];
+
+  for (const target of PLACE_LABEL_TARGETS) {
+    if (!map.getLayer(target.layerId)) continue;
+    const layer = layers.find((item) => item.id === target.layerId);
+    boosts.push({
+      layerId: target.layerId,
+      minzoom: layer?.minzoom ?? 0,
+      maxzoom: layer?.maxzoom ?? 24,
+      textPadding: map.getLayoutProperty(target.layerId, 'text-padding'),
+      textAllowOverlap: map.getLayoutProperty(target.layerId, 'text-allow-overlap'),
+      targetMinzoom: target.minzoom,
+    });
+  }
+
+  return boosts;
+}
+
+function applyPlaceLabelBoosts(map: MLMap, boosts: PlaceLabelBoost[]): void {
+  for (const boost of boosts) {
+    if (!map.getLayer(boost.layerId)) continue;
+    map.setLayerZoomRange(boost.layerId, boost.targetMinzoom, boost.maxzoom);
+    map.setLayoutProperty(boost.layerId, 'text-padding', 0.4);
+    if (boost.layerId === 'label_city' || boost.layerId === 'label_city_capital') continue;
+    map.setLayoutProperty(boost.layerId, 'text-allow-overlap', true);
+  }
+}
+
+function restorePlaceLabelBoosts(map: MLMap, boosts: PlaceLabelBoost[]): void {
+  for (const boost of boosts) {
+    if (!map.getLayer(boost.layerId)) continue;
+    map.setLayerZoomRange(boost.layerId, boost.minzoom, boost.maxzoom);
+    map.setLayoutProperty(boost.layerId, 'text-padding', boost.textPadding ?? 2);
+    map.setLayoutProperty(boost.layerId, 'text-allow-overlap', boost.textAllowOverlap ?? false);
+  }
+}
+
+interface SourceOverride {
+  id: 'points' | 'track';
+  source: GeoJSONSource;
+  prev: string | GeoJSON.GeoJSON;
+  next: PointFC | TrackFC;
+}
+
+function collectSourceOverrides(
+  map: MLMap,
+  exportCtx?: ExportContext,
+): SourceOverride[] {
+  if (!exportCtx?.sourceData) return [];
+  const overrides: SourceOverride[] = [];
+  const pairs = [
+    ['points', exportCtx.sourceData.points],
+    ['track', exportCtx.sourceData.track],
+  ] as const;
+
+  for (const [id, next] of pairs) {
+    if (!next) continue;
+    const source = map.getSource(id) as GeoJSONSource | undefined;
+    const prev = readGeoJsonSourceData(source);
+    if (!source || !prev) continue;
+    overrides.push({ id, source, prev, next });
+  }
+  return overrides;
+}
+
+function readGeoJsonSourceData(source: GeoJSONSource | undefined): string | GeoJSON.GeoJSON | null {
+  if (!source) return null;
+  return ((source as unknown as { _data?: string | GeoJSON.GeoJSON })._data ?? null);
+}
+
+interface LabelBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+function drawPlaceLabels(
+  ctx: CanvasRenderingContext2D,
+  map: MLMap,
+  labels: SharePlaceLabel[],
+  scale: number,
+  outW: number,
+  outH: number,
+  px: (n: number) => number,
+): void {
+  if (labels.length === 0) return;
+
+  const placed: LabelBox[] = [];
+  const titleSafeBox: LabelBox = {
+    left: 0,
+    top: 0,
+    right: px(780),
+    bottom: px(300),
+  };
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `800 ${px(22)}px "Avenir Next", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(250, 248, 243, 0.96)';
+  ctx.lineWidth = px(7);
+  ctx.fillStyle = 'rgba(17, 24, 39, 0.96)';
+
+  const candidates = [...labels]
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 24);
+
+  for (const label of candidates) {
+    const point = map.project([label.lon, label.lat]);
+    const x = point.x * scale;
+    const y = point.y * scale;
+    if (x < px(28) || x > outW - px(28) || y < px(28) || y > outH - px(28)) continue;
+
+    const width = ctx.measureText(label.name).width + px(30);
+    const height = px(38);
+    const box: LabelBox = {
+      left: x - width / 2,
+      right: x + width / 2,
+      top: y - height / 2,
+      bottom: y + height / 2,
+    };
+    if (intersects(box, titleSafeBox)) continue;
+    if (placed.some((item) => intersects(item, box))) continue;
+
+    ctx.strokeText(label.name, x, y);
+    ctx.fillText(label.name, x, y);
+    placed.push(box);
+  }
+
+  ctx.restore();
+}
+
+function intersects(a: LabelBox, b: LabelBox): boolean {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
 async function renderWithOverlay(
@@ -157,13 +364,14 @@ async function renderWithOverlay(
   summary: Summary,
   opts: ShareOptions,
   exportCtx?: ExportContext,
+  outSize: ExportSize = { width: DEFAULT_OUT_W, height: DEFAULT_OUT_H },
 ): Promise<Blob> {
   const srcCanvas = map.getCanvas();
   // MapLibre canvas.width = CSS 像素 × DPR；输出保留 Retina 清晰度，但 Safari >16MP 会失败，cap 2×
-  const rawScale = Math.max(1, srcCanvas.width / OUT_W);
+  const rawScale = Math.max(1, srcCanvas.width / outSize.width);
   const scale = Math.min(rawScale, 2);
-  const outW = Math.round(OUT_W * scale);
-  const outH = Math.round(OUT_H * scale);
+  const outW = Math.round(outSize.width * scale);
+  const outH = Math.round(outSize.height * scale);
 
   const out = document.createElement('canvas');
   out.width = outW;
@@ -183,6 +391,7 @@ async function renderWithOverlay(
 
   // 所有坐标基于 1920 基准，px() 乘以 scale 适配高 DPR
   const px = (n: number) => Math.round(n * scale);
+  drawPlaceLabels(ctx, map, exportCtx?.placeLabels ?? [], scale, outW, outH, px);
 
   const TITLE_X = px(64);
   let cursorY = px(60);
@@ -229,7 +438,12 @@ async function renderWithOverlay(
       ctx.fillRect(TITLE_X, cursorY, Math.min(titleW, px(320)), px(3));
       cursorY += px(18);
 
-      if (summary.years.length) {
+      if (exportCtx?.subtitle) {
+        ctx.fillStyle = textDimColor;
+        ctx.font = `500 ${px(14)}px "SFMono-Regular", "Cascadia Mono", ui-monospace, monospace`;
+        ctx.fillText(exportCtx.subtitle, TITLE_X, cursorY);
+        cursorY += px(44);
+      } else if (summary.years.length) {
         ctx.fillStyle = textDimColor;
         ctx.font = `500 ${px(14)}px "SFMono-Regular", "Cascadia Mono", ui-monospace, monospace`;
         const yrRange = `${summary.years[0]} — ${summary.years[summary.years.length - 1]}`;
@@ -245,7 +459,7 @@ async function renderWithOverlay(
 
   // ========== Stats 单行：数字 + 右侧内联 label ==========
   if (opts.stats) {
-    const stats: Array<{ num: string; label: string }> = yrStat
+    const stats: Array<{ num: string; label: string }> = exportCtx?.stats ?? (yrStat
       ? [
           { num: yrStat.km.toLocaleString(), label: 'KM' },
           { num: String(yrStat.citiesTotal), label: 'CITIES' },
@@ -255,7 +469,7 @@ async function renderWithOverlay(
           { num: summary.kmTraveled.toLocaleString(), label: 'KM' },
           { num: String(summary.citiesTotal), label: 'CITIES' },
           { num: summary.totalPoints.toLocaleString(), label: 'POINTS' },
-        ];
+        ]);
 
     const numFont = `800 ${px(48)}px "Avenir Next", "PingFang SC", system-ui, sans-serif`;
     const labelFont = `500 ${px(16)}px "SFMono-Regular", "Cascadia Mono", ui-monospace, monospace`;

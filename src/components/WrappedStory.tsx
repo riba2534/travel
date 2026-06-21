@@ -17,6 +17,9 @@ const SHARE_OPTS_YEAR = {
   showPoints: false,
   showTrack: false,
   showHeatmap: false,
+  dateRangeEnabled: false,
+  dateStart: '',
+  dateEnd: '',
 } as const;
 const BOOST_GLOW_RADIUS = 14;
 const BOOST_CORE_RADIUS = 4;
