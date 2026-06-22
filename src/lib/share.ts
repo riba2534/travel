@@ -1,11 +1,25 @@
 import type { GeoJSONSource, Map as MLMap } from 'maplibre-gl';
 import type { PointFC, Summary, TrackFC } from './types';
-import type { ShareOptions } from '../state/store';
+import type { ShareOptions, SharePointSize, ShareTrackWidth } from '../state/store';
 import type { SharePlaceLabel, ShareRangeStats } from './share-date-range';
 
 const DEFAULT_OUT_W = 1920;
 const DEFAULT_OUT_H = 1080;
 const BRAND_NAME = 'HPCのJourneys';
+
+const POINT_SIZE_STYLES: Record<SharePointSize, { glow: number; core: number }> = {
+  fine: { glow: 3.5, core: 1.1 },
+  standard: { glow: 5.5, core: 1.7 },
+  bold: { glow: 8, core: 2.5 },
+  poster: { glow: 11, core: 3.4 },
+};
+
+const TRACK_WIDTH_STYLES: Record<ShareTrackWidth, number> = {
+  thin: 1,
+  standard: 2,
+  bold: 3.2,
+  poster: 4.8,
+};
 
 // 主图默认 layer id。年度图 layer id 前缀不同，调用方需显式传 layerIds: {}（或自己的 id）
 const DEFAULT_LAYER_IDS = {
@@ -115,11 +129,13 @@ export async function exportShare(
     prop: string;
     target: number;
   }
+  const pointStyle = POINT_SIZE_STYLES[opts.pointSize ?? 'bold'] ?? POINT_SIZE_STYLES.bold;
+  const trackWidth = TRACK_WIDTH_STYLES[opts.trackWidth ?? 'standard'] ?? TRACK_WIDTH_STYLES.standard;
   const boostTargets: PaintBoost[] = [];
-  if (ids.pointsGlow) boostTargets.push({ layerId: ids.pointsGlow, prop: 'circle-radius', target: 8 });
-  if (ids.pointsCore) boostTargets.push({ layerId: ids.pointsCore, prop: 'circle-radius', target: 2.5 });
+  if (ids.pointsGlow) boostTargets.push({ layerId: ids.pointsGlow, prop: 'circle-radius', target: pointStyle.glow });
+  if (ids.pointsCore) boostTargets.push({ layerId: ids.pointsCore, prop: 'circle-radius', target: pointStyle.core });
   if (ids.track) {
-    boostTargets.push({ layerId: ids.track, prop: 'line-width', target: 2 });
+    boostTargets.push({ layerId: ids.track, prop: 'line-width', target: trackWidth });
     boostTargets.push({ layerId: ids.track, prop: 'line-opacity', target: 0.85 });
   }
   const prevPaint = new Map<string, unknown>();

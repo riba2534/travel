@@ -1,7 +1,13 @@
 // SettingsPanel 分享 tab 的内容：控制 ShareButton 一键出图时显示哪些内容。
 // 修改这里的默认值会影响下一次点「生成分享图」的输出。
 
-import { useAppStore, type ShareOptions, type ShareToggleKey } from '../state/store';
+import {
+  useAppStore,
+  type ShareOptions,
+  type SharePointSize,
+  type ShareToggleKey,
+  type ShareTrackWidth,
+} from '../state/store';
 
 const LAYER_OPTS: Array<{ key: ShareToggleKey; label: string; hint: string }> = [
   { key: 'showPoints', label: '轨迹点', hint: '发光的点位层（默认开）' },
@@ -15,10 +21,25 @@ const TEXT_OPTS: Array<{ key: ShareToggleKey; label: string; hint: string }> = [
   { key: 'date', label: '签名 + 日期', hint: '右下角品牌 + 生成日期' },
 ];
 
+const POINT_SIZE_OPTS: Array<{ value: SharePointSize; label: string; hint: string }> = [
+  { value: 'fine', label: '精细', hint: '更接近真实点位' },
+  { value: 'standard', label: '标准', hint: '减少区域遮挡' },
+  { value: 'bold', label: '醒目', hint: '当前默认大小' },
+  { value: 'poster', label: '海报', hint: '最强视觉效果' },
+];
+
+const TRACK_WIDTH_OPTS: Array<{ value: ShareTrackWidth; label: string; hint: string }> = [
+  { value: 'thin', label: '细线', hint: '轻量路径' },
+  { value: 'standard', label: '标准', hint: '当前默认粗细' },
+  { value: 'bold', label: '粗线', hint: '强调路线' },
+  { value: 'poster', label: '海报', hint: '最强路径存在感' },
+];
+
 export default function ShareSettings() {
   const shareOpts = useAppStore((s) => s.shareOpts);
   const setShareOpt = useAppStore((s) => s.setShareOpt);
   const setShareDateRange = useAppStore((s) => s.setShareDateRange);
+  const setShareStyle = useAppStore((s) => s.setShareStyle);
   const dateRangeEnabled = shareOpts.dateRangeEnabled ?? false;
 
   return (
@@ -73,7 +94,63 @@ export default function ShareSettings() {
       </div>
 
       <Group title="地图图层" opts={LAYER_OPTS} values={shareOpts} onChange={setShareOpt} />
+
+      <ChoiceGroup
+        title="点位大小"
+        value={shareOpts.pointSize ?? 'bold'}
+        opts={POINT_SIZE_OPTS}
+        onChange={(pointSize) => setShareStyle({ pointSize })}
+      />
+
+      <ChoiceGroup
+        title="轨迹线粗细"
+        value={shareOpts.trackWidth ?? 'standard'}
+        opts={TRACK_WIDTH_OPTS}
+        onChange={(trackWidth) => setShareStyle({ trackWidth })}
+      />
+
       <Group title="文字叠加" opts={TEXT_OPTS} values={shareOpts} onChange={setShareOpt} />
+    </div>
+  );
+}
+
+function ChoiceGroup<T extends string>({
+  title,
+  value,
+  opts,
+  onChange,
+}: {
+  title: string;
+  value: T;
+  opts: Array<{ value: T; label: string; hint: string }>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim">{title}</div>
+      <div className="grid grid-cols-2 gap-2">
+        {opts.map((opt) => {
+          const active = opt.value === value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(opt.value)}
+              className="min-h-12 rounded-md border px-2 py-1.5 text-left transition-colors"
+              style={{
+                borderColor: active ? 'var(--accent)' : 'var(--ui-border)',
+                background: active
+                  ? 'color-mix(in srgb, var(--accent) 14%, transparent)'
+                  : 'transparent',
+              }}
+            >
+              <span className="block text-xs font-medium text-text">{opt.label}</span>
+              <span className="block text-[10px] leading-snug text-text-dim">{opt.hint}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

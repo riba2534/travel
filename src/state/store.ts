@@ -36,7 +36,13 @@ export interface ShareOptions {
   dateRangeEnabled: boolean;
   dateStart: string;
   dateEnd: string;
+  // 导出图符号样式。bold/standard 保留当前默认视觉，其他档位给更细或更强的选择。
+  pointSize: SharePointSize;
+  trackWidth: ShareTrackWidth;
 }
+
+export type SharePointSize = 'fine' | 'standard' | 'bold' | 'poster';
+export type ShareTrackWidth = 'thin' | 'standard' | 'bold' | 'poster';
 
 export type ShareToggleKey = {
   [K in keyof ShareOptions]: ShareOptions[K] extends boolean ? K : never;
@@ -45,6 +51,8 @@ export type ShareToggleKey = {
 export type ShareDateRangePatch = Partial<
   Pick<ShareOptions, 'dateRangeEnabled' | 'dateStart' | 'dateEnd'>
 >;
+
+export type ShareStylePatch = Partial<Pick<ShareOptions, 'pointSize' | 'trackWidth'>>;
 
 interface AppState {
   summary: Summary | null;
@@ -72,6 +80,7 @@ interface AppState {
   flyTo: (t: Omit<FlyTarget, 'nonce'>) => void;
   setShareOpt: (key: ShareToggleKey, v: boolean) => void;
   setShareDateRange: (patch: ShareDateRangePatch) => void;
+  setShareStyle: (patch: ShareStylePatch) => void;
 }
 
 const DEFAULT_SHARE_OPTS: ShareOptions = {
@@ -86,6 +95,8 @@ const DEFAULT_SHARE_OPTS: ShareOptions = {
   dateRangeEnabled: false,
   dateStart: '',
   dateEnd: '',
+  pointSize: 'bold',
+  trackWidth: 'standard',
 };
 
 export const useAppStore = create<AppState>()(
@@ -123,6 +134,10 @@ export const useAppStore = create<AppState>()(
       setShareOpt: (key, v) =>
         set((st) => ({ shareOpts: { ...DEFAULT_SHARE_OPTS, ...st.shareOpts, [key]: v } })),
       setShareDateRange: (patch) =>
+        set((st) => ({
+          shareOpts: { ...DEFAULT_SHARE_OPTS, ...st.shareOpts, ...patch },
+        })),
+      setShareStyle: (patch) =>
         set((st) => ({
           shareOpts: { ...DEFAULT_SHARE_OPTS, ...st.shareOpts, ...patch },
         })),

@@ -20,6 +20,8 @@ const SHARE_OPTS_YEAR = {
   dateRangeEnabled: false,
   dateStart: '',
   dateEnd: '',
+  pointSize: 'bold',
+  trackWidth: 'standard',
 } as const;
 const BOOST_GLOW_RADIUS = 14;
 const BOOST_CORE_RADIUS = 4;
