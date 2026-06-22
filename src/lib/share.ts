@@ -93,7 +93,7 @@ export async function exportShare(
   // layer id 解析：exportCtx.layerIds 未传用主图默认；传 {} 则全部 undefined，跳过所有切换
   const ids: LayerIds = exportCtx?.layerIds ?? DEFAULT_LAYER_IDS;
   const sourceOverrides = collectSourceOverrides(map, exportCtx);
-  const labelBoosts = collectPlaceLabelBoosts(map, exportCtx?.enhancePlaceLabels ?? false);
+  const labelBoosts = collectPlaceLabelBoosts(map, exportCtx?.enhancePlaceLabels ?? true);
 
   // 1. 按 opts 临时覆盖主图图层可见性（仅对导出生效，finally 还原）
   type LayerVisOverride = { layerId: string; want: boolean };
@@ -205,17 +205,19 @@ interface PlaceLabelBoost {
   minzoom: number;
   maxzoom: number;
   textPadding: unknown;
-  textAllowOverlap: unknown;
   targetMinzoom: number;
 }
 
 const PLACE_LABEL_TARGETS: Array<{ layerId: string; minzoom: number }> = [
-  { layerId: 'label_city', minzoom: 3 },
-  { layerId: 'label_city_capital', minzoom: 3 },
-  { layerId: 'label_state', minzoom: 4.2 },
-  { layerId: 'label_town', minzoom: 4.4 },
-  { layerId: 'label_village', minzoom: 5.1 },
-  { layerId: 'label_other', minzoom: 5.1 },
+  { layerId: 'label_country_1', minzoom: 0 },
+  { layerId: 'label_country_2', minzoom: 0 },
+  { layerId: 'label_country_3', minzoom: 0 },
+  { layerId: 'label_state', minzoom: 0 },
+  { layerId: 'label_city', minzoom: 1.2 },
+  { layerId: 'label_city_capital', minzoom: 1.2 },
+  { layerId: 'label_town', minzoom: 2.2 },
+  { layerId: 'label_village', minzoom: 3.2 },
+  { layerId: 'label_other', minzoom: 3.2 },
 ];
 
 function collectPlaceLabelBoosts(map: MLMap, enabled: boolean): PlaceLabelBoost[] {
@@ -231,7 +233,6 @@ function collectPlaceLabelBoosts(map: MLMap, enabled: boolean): PlaceLabelBoost[
       minzoom: layer?.minzoom ?? 0,
       maxzoom: layer?.maxzoom ?? 24,
       textPadding: map.getLayoutProperty(target.layerId, 'text-padding'),
-      textAllowOverlap: map.getLayoutProperty(target.layerId, 'text-allow-overlap'),
       targetMinzoom: target.minzoom,
     });
   }
@@ -244,8 +245,6 @@ function applyPlaceLabelBoosts(map: MLMap, boosts: PlaceLabelBoost[]): void {
     if (!map.getLayer(boost.layerId)) continue;
     map.setLayerZoomRange(boost.layerId, boost.targetMinzoom, boost.maxzoom);
     map.setLayoutProperty(boost.layerId, 'text-padding', 0.4);
-    if (boost.layerId === 'label_city' || boost.layerId === 'label_city_capital') continue;
-    map.setLayoutProperty(boost.layerId, 'text-allow-overlap', true);
   }
 }
 
@@ -254,7 +253,6 @@ function restorePlaceLabelBoosts(map: MLMap, boosts: PlaceLabelBoost[]): void {
     if (!map.getLayer(boost.layerId)) continue;
     map.setLayerZoomRange(boost.layerId, boost.minzoom, boost.maxzoom);
     map.setLayoutProperty(boost.layerId, 'text-padding', boost.textPadding ?? 2);
-    map.setLayoutProperty(boost.layerId, 'text-allow-overlap', boost.textAllowOverlap ?? false);
   }
 }
 
